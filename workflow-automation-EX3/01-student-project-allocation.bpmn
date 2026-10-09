@@ -1,0 +1,1649 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_student-project-allocation" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.50.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.8.0">
+  <bpmn:collaboration id="Collaboration_student-project-allocation">
+    <bpmn:participant id="Participant_Main" name="Department — Final-Year Project Programme" processRef="student-project-allocation" />
+    <bpmn:participant id="Participant_Guide" name="Faculty Guide">
+      <bpmn:documentation>Each faculty member is an independent participant who receives an allocation request and replies. Modelled as a separate (black-box) pool so the reply can be awaited with an event-based gateway.</bpmn:documentation>
+    </bpmn:participant>
+    <bpmn:messageFlow id="MsgFlow_Request" name="Allocation request" sourceRef="Task_SendRequest" targetRef="Participant_Guide" />
+    <bpmn:messageFlow id="MsgFlow_Accept" name="Acceptance" sourceRef="Participant_Guide" targetRef="Catch_Accepted" />
+    <bpmn:messageFlow id="MsgFlow_Decline" name="Decline" sourceRef="Participant_Guide" targetRef="Catch_Declined" />
+    <bpmn:messageFlow id="MsgFlow_Withdraw" name="Withdrawal" sourceRef="Participant_Guide" targetRef="Bnd_Withdrawal" />
+  </bpmn:collaboration>
+  <bpmn:process id="student-project-allocation" name="Student Project Approval and Allocation" isExecutable="true">
+    <bpmn:documentation>Takes a final-year project proposal from submission through validation, screening, committee review and guide allocation. Every failure point found in the analysis (F1–F12 in the Failure Path Register) is handled inside the model, either by a gateway branch, a boundary event, a bounded loop, an error, or a manual fallback.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_Main">
+      <bpmn:lane id="Lane_Student" name="Student / Team">
+        <bpmn:documentation>The student team submitting the proposal.</bpmn:documentation>
+        <bpmn:flowNodeRef>Start_ProposalIntent</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_SubmitMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SubmitProposal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_SubmissionDeadline</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReviseProposal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_RevisionTimeout</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_RevisionLapsed</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Committee" name="Review Committee (incl. HoD)">
+        <bpmn:documentation>Faculty committee that evaluates proposals; the HoD sits on it and receives escalations.</bpmn:documentation>
+        <bpmn:flowNodeRef>Gw_CommitteeMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_EvaluateProposal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_ReviewReminder</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_ReviewOverdue</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_HoDExpedite</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Escalated</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_CommitteeDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_RevisionsLeft</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_FinalDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_FinalDecision</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Coordinator" name="Project Coordinator">
+        <bpmn:documentation>Runs the programme, screens proposals and handles every manual fallback.</bpmn:documentation>
+        <bpmn:flowNodeRef>Task_DecideLateRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_LateAllowed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Lapsed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ResolveValidation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ScreenProposal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReviewMatch</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_MatchVerdict</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ChaseCommittee</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_ReminderSent</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ManualAllocation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_GuideArranged</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Catch_NextRound</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ManualNotify</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_System" name="Project Management System">
+        <bpmn:documentation>Automated work: validation, similarity checking, guide matching, records and notifications.</bpmn:documentation>
+        <bpmn:flowNodeRef>Task_ValidateProposal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_ValidationResult</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_NotifyInvalidTeam</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_InvalidTeam</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_CorrectionsLeft</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReturnErrors</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_ScreenMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_ScreenSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SimilarityCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_ScreenJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Similarity</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_RejectMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SendRejection</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_NewTopicAllowed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Rejected</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_AllocMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Sub_Allocation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_NoGuide</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_Withdrawal</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CloseAllocation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_WhoWithdrew</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_TeamWithdrawn</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_AllocatedMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_FinishSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_NotifyTeam</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_NotifyFailed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_NotifiedMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RecordAllocation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_FinishJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Allocated</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_ProposalIntent" name="Team decides to submit proposal">
+      <bpmn:documentation>Process starts when a registered student team decides to submit a final-year project proposal.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Start</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="Gw_SubmitMerge">
+      <bpmn:documentation>Merge: first submission and every permitted resubmission (corrections, modified topic, new topic, late approval) re-enter here.</bpmn:documentation>
+      <bpmn:incoming>Flow_Start</bpmn:incoming>
+      <bpmn:incoming>Flow_LateYes</bpmn:incoming>
+      <bpmn:incoming>Flow_ErrorsReturned</bpmn:incoming>
+      <bpmn:incoming>Flow_Partial</bpmn:incoming>
+      <bpmn:incoming>Flow_NewTopicYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToSubmit</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_SubmitProposal" name="Submit project proposal">
+      <bpmn:documentation>Team fills in the proposal form (title, abstract, objectives, members, preferred domain) on the portal. Remarks from earlier rounds are shown on the form when the task is a resubmission.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/submit-project-proposal" />
+        <zeebe:assignmentDefinition candidateGroups="students" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToSubmit</bpmn:incoming>
+      <bpmn:outgoing>Flow_Submitted</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:boundaryEvent id="Bnd_SubmissionDeadline" name="Submission deadline passed" cancelActivity="true" attachedToRef="Task_SubmitProposal">
+      <bpmn:documentation>F4 — interrupting timer: the team has not submitted within the submission window.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Deadline</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_SubmissionDeadline_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P21D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:userTask id="Task_DecideLateRequest" name="Decide late-submission request">
+      <bpmn:documentation>F4 — the coordinator considers whether the late team may still submit (medical reasons, approved leave, etc.).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/decide-late-submission-request" />
+        <zeebe:assignmentDefinition candidateGroups="project-coordinator" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Deadline</bpmn:incoming>
+      <bpmn:outgoing>Flow_LateDecided</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_LateAllowed" name="Late submission allowed?" default="Flow_LateNo">
+      <bpmn:documentation>Exclusive: the coordinator either re-opens submission or the proposal lapses.</bpmn:documentation>
+      <bpmn:incoming>Flow_LateDecided</bpmn:incoming>
+      <bpmn:outgoing>Flow_LateYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_LateNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_Lapsed" name="Proposal lapsed">
+      <bpmn:documentation>Terminal: no proposal received within the (extended) window.</bpmn:documentation>
+      <bpmn:incoming>Flow_LateNo</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_ValidateProposal" name="Validate form and team rules">
+      <bpmn:documentation>Checks mandatory fields, abstract length, roll numbers against the student register, team size and that no member already belongs to another team. Each run increments validationAttempts so the correction loop is bounded.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="validate-proposal" />
+        <zeebe:ioMapping>
+          <zeebe:output source="=validation" target="validation" />
+          <zeebe:output source="=if validationAttempts = null then 1 else validationAttempts + 1" target="validationAttempts" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Submitted</bpmn:incoming>
+      <bpmn:outgoing>Flow_Validated</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_ValidationResult" name="Validation result?" default="Flow_Incomplete">
+      <bpmn:documentation>Exclusive three-way split on the validator output: valid, team rule broken, or form incomplete (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_Validated</bpmn:incoming>
+      <bpmn:outgoing>Flow_Valid</bpmn:outgoing>
+      <bpmn:outgoing>Flow_TeamInvalid</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Incomplete</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="Task_NotifyInvalidTeam" name="Notify team of rule violation">
+      <bpmn:documentation>F2 — tells the team which rule failed (team too large, member already in another team) so the team can be reformed and registered again.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="notify-invalid-team" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_TeamInvalid</bpmn:incoming>
+      <bpmn:outgoing>Flow_InvalidNotified</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="End_InvalidTeam" name="Invalid team — closed">
+      <bpmn:documentation>Terminal for this instance: the team must be reformed before a fresh proposal can be filed.</bpmn:documentation>
+      <bpmn:incoming>Flow_InvalidNotified</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gw_CorrectionsLeft" name="Correction attempts left?" default="Flow_CorrNo">
+      <bpmn:documentation>F1 — bounded loop: at most 2 automatic correction rounds.</bpmn:documentation>
+      <bpmn:incoming>Flow_Incomplete</bpmn:incoming>
+      <bpmn:outgoing>Flow_CorrYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_CorrNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="Task_ReturnErrors" name="Return proposal with error list">
+      <bpmn:documentation>F1 — sends the list of missing / invalid fields back to the team; the team resubmits via the merge before the submit task.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="return-proposal-errors" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_CorrYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_ErrorsReturned</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:userTask id="Task_ResolveValidation" name="Resolve validation issues with team">
+      <bpmn:documentation>F1 escalation — after 2 failed rounds the coordinator works through the problems with the team directly and releases the proposal for screening.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/resolve-validation-issues-with-team" />
+        <zeebe:assignmentDefinition candidateGroups="project-coordinator" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_CorrNo</bpmn:incoming>
+      <bpmn:outgoing>Flow_Resolved</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_ScreenMerge">
+      <bpmn:documentation>Merge: valid proposals and proposals released by the coordinator after manual correction.</bpmn:documentation>
+      <bpmn:incoming>Flow_Valid</bpmn:incoming>
+      <bpmn:incoming>Flow_Resolved</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToScreenSplit</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:parallelGateway id="Gw_ScreenSplit">
+      <bpmn:documentation>Parallel split: coordinator screening and the automated similarity check are independent, so they run at the same time.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToScreenSplit</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToScreen</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ToSimilarity</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:userTask id="Task_ScreenProposal" name="Screen proposal for scope">
+      <bpmn:documentation>Coordinator checks the proposal is in-syllabus and complete enough for the committee, and records remarks for the reviewers.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/screen-proposal-for-scope" />
+        <zeebe:assignmentDefinition candidateGroups="project-coordinator" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToScreen</bpmn:incoming>
+      <bpmn:outgoing>Flow_Screened</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Task_SimilarityCheck" name="Run similarity check">
+      <bpmn:documentation>Compares title and abstract against the archive of earlier projects and this year's proposals; returns similarityScore.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="similarity-check" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToSimilarity</bpmn:incoming>
+      <bpmn:outgoing>Flow_SimChecked</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:parallelGateway id="Gw_ScreenJoin">
+      <bpmn:documentation>Parallel join: waits for both screening branches.</bpmn:documentation>
+      <bpmn:incoming>Flow_Screened</bpmn:incoming>
+      <bpmn:incoming>Flow_SimChecked</bpmn:incoming>
+      <bpmn:outgoing>Flow_Joined</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:exclusiveGateway id="Gw_Similarity" name="Similarity above threshold?" default="Flow_SimLow">
+      <bpmn:documentation>F3 — exclusive: high similarity goes to a human, otherwise straight to the committee (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_Joined</bpmn:incoming>
+      <bpmn:outgoing>Flow_SimHigh</bpmn:outgoing>
+      <bpmn:outgoing>Flow_SimLow</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_ReviewMatch" name="Review similarity match">
+      <bpmn:documentation>F3 — coordinator compares the proposal with the matched project(s) and classifies the overlap.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/review-similarity-match" />
+        <zeebe:assignmentDefinition candidateGroups="project-coordinator" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_SimHigh</bpmn:incoming>
+      <bpmn:outgoing>Flow_MatchReviewed</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_MatchVerdict" name="Overlap verdict?" default="Flow_FalsePositive">
+      <bpmn:documentation>F3 — exclusive: duplicate, partial overlap (fixable), or false positive (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_MatchReviewed</bpmn:incoming>
+      <bpmn:outgoing>Flow_Duplicate</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Partial</bpmn:outgoing>
+      <bpmn:outgoing>Flow_FalsePositive</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_CommitteeMerge">
+      <bpmn:documentation>Merge: first review and every revised proposal arrive here.</bpmn:documentation>
+      <bpmn:incoming>Flow_SimLow</bpmn:incoming>
+      <bpmn:incoming>Flow_FalsePositive</bpmn:incoming>
+      <bpmn:incoming>Flow_Revised</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEvaluate</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_EvaluateProposal" name="Evaluate proposal">
+      <bpmn:documentation>Committee scores feasibility, novelty and scope and records a decision: APPROVE, REVISE or REJECT.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/evaluate-proposal" />
+        <zeebe:assignmentDefinition candidateGroups="review-committee" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToEvaluate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Evaluated</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:boundaryEvent id="Bnd_ReviewReminder" name="No decision in 5 days" cancelActivity="false" attachedToRef="Task_EvaluateProposal">
+      <bpmn:documentation>F7 — non-interrupting timer: the review carries on, a reminder is raised in parallel.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Remind</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_ReviewReminder_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P5D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Bnd_ReviewOverdue" name="Overdue after 10 days" cancelActivity="false" attachedToRef="Task_EvaluateProposal">
+      <bpmn:documentation>F7 — second non-interrupting timer: escalates to the HoD while the review is still open.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Overdue</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_ReviewOverdue_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P10D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:userTask id="Task_ChaseCommittee" name="Chase committee for decision">
+      <bpmn:documentation>F7 — coordinator reminds the reviewers; the review task itself stays open.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/chase-committee-for-decision" />
+        <zeebe:assignmentDefinition candidateGroups="project-coordinator" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Remind</bpmn:incoming>
+      <bpmn:outgoing>Flow_Chased</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="End_ReminderSent" name="Reminder sent">
+      <bpmn:documentation>Ends the reminder branch only; the main token is still at the review task.</bpmn:documentation>
+      <bpmn:incoming>Flow_Chased</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="Task_HoDExpedite" name="HoD expedites review">
+      <bpmn:documentation>F7 escalation — HoD intervenes (re-assigns a reviewer or convenes a meeting) to get a decision.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/hod-expedites-review" />
+        <zeebe:assignmentDefinition candidateGroups="hod" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Overdue</bpmn:incoming>
+      <bpmn:outgoing>Flow_Expedited</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="End_Escalated" name="Escalation handled">
+      <bpmn:documentation>Ends the escalation branch only.</bpmn:documentation>
+      <bpmn:incoming>Flow_Expedited</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gw_CommitteeDecision" name="Committee decision?" default="Flow_Reject">
+      <bpmn:documentation>Exclusive three-way decision. Reject is the default so a missing or malformed decision never approves a proposal.</bpmn:documentation>
+      <bpmn:incoming>Flow_Evaluated</bpmn:incoming>
+      <bpmn:outgoing>Flow_Approve</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Revise</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Reject</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_RevisionsLeft" name="Revision cycles left?" default="Flow_RevNo">
+      <bpmn:documentation>F5 — bounded loop: maximum 2 revision cycles.</bpmn:documentation>
+      <bpmn:incoming>Flow_Revise</bpmn:incoming>
+      <bpmn:outgoing>Flow_RevYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_RevNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_ReviseProposal" name="Revise and resubmit proposal">
+      <bpmn:documentation>F5 — team addresses the committee comments and resubmits. Counts the cycle.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/revise-and-resubmit-proposal" />
+        <zeebe:assignmentDefinition candidateGroups="students" />
+        <zeebe:ioMapping>
+          <zeebe:output source="=if revisionCount = null then 1 else revisionCount + 1" target="revisionCount" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_RevYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_Revised</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:boundaryEvent id="Bnd_RevisionTimeout" name="No resubmission in 7 days" cancelActivity="true" attachedToRef="Task_ReviseProposal">
+      <bpmn:documentation>F5 — interrupting timer on the revision.</bpmn:documentation>
+      <bpmn:outgoing>Flow_RevTimeout</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_RevisionTimeout_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_RevisionLapsed" name="Revision lapsed">
+      <bpmn:documentation>Terminal: the team did not resubmit in time.</bpmn:documentation>
+      <bpmn:incoming>Flow_RevTimeout</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="Task_FinalDecision" name="Record final approve / reject">
+      <bpmn:documentation>F5 — after 2 cycles the committee must close the matter with a binding approve or reject.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/record-final-approve-reject" />
+        <zeebe:assignmentDefinition candidateGroups="review-committee" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_RevNo</bpmn:incoming>
+      <bpmn:outgoing>Flow_FinalRecorded</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_FinalDecision" name="Final verdict?" default="Flow_FinalReject">
+      <bpmn:documentation>Exclusive: approve or reject (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_FinalRecorded</bpmn:incoming>
+      <bpmn:outgoing>Flow_FinalApprove</bpmn:outgoing>
+      <bpmn:outgoing>Flow_FinalReject</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_RejectMerge">
+      <bpmn:documentation>Merge: rejections from the committee and duplicates found at screening.</bpmn:documentation>
+      <bpmn:incoming>Flow_Duplicate</bpmn:incoming>
+      <bpmn:incoming>Flow_Reject</bpmn:incoming>
+      <bpmn:incoming>Flow_FinalReject</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRejection</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="Task_SendRejection" name="Send rejection with reasons">
+      <bpmn:documentation>F6 — sends the recorded reasons to the team and counts the rejection.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-rejection" />
+        <zeebe:ioMapping>
+          <zeebe:output source="=if rejections = null then 1 else rejections + 1" target="rejections" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToRejection</bpmn:incoming>
+      <bpmn:outgoing>Flow_RejectionSent</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:exclusiveGateway id="Gw_NewTopicAllowed" name="New topic allowed?" default="Flow_NewTopicNo">
+      <bpmn:documentation>F6 — one fresh topic is allowed after the first rejection; the second rejection is final.</bpmn:documentation>
+      <bpmn:incoming>Flow_RejectionSent</bpmn:incoming>
+      <bpmn:outgoing>Flow_NewTopicYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NewTopicNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_Rejected" name="Proposal rejected">
+      <bpmn:documentation>Terminal: proposal closed as rejected.</bpmn:documentation>
+      <bpmn:incoming>Flow_NewTopicNo</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gw_AllocMerge">
+      <bpmn:documentation>Merge: approved proposals, a new allocation round after a wait, and re-allocation after a guide withdraws.</bpmn:documentation>
+      <bpmn:incoming>Flow_Approve</bpmn:incoming>
+      <bpmn:incoming>Flow_FinalApprove</bpmn:incoming>
+      <bpmn:incoming>Flow_RoundDue</bpmn:incoming>
+      <bpmn:incoming>Flow_ByGuide</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToAllocation</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:subProcess id="Sub_Allocation" name="Guide allocation">
+      <bpmn:documentation>Embedded sub-process that negotiates one guide for the team. Interrupted by a withdrawal message; throws NO_GUIDE when no guide can be secured.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToAllocation</bpmn:incoming>
+      <bpmn:outgoing>Flow_Allocated</bpmn:outgoing>
+      <bpmn:startEvent id="Start_Alloc" name="Allocation started">
+        <bpmn:documentation>Blank start of the sub-process.</bpmn:documentation>
+        <bpmn:outgoing>Flow_A1</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:exclusiveGateway id="Gw_TryMerge">
+        <bpmn:documentation>Merge for the retry loop.</bpmn:documentation>
+        <bpmn:incoming>Flow_A1</bpmn:incoming>
+        <bpmn:incoming>Flow_RetryYes</bpmn:incoming>
+        <bpmn:outgoing>Flow_A2</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:businessRuleTask id="Task_MatchGuide" name="Match guide by domain and workload">
+        <bpmn:documentation>F8 — decision rule: guide domain must match the project domain, guide must be available this term, and current load must be under the maximum. Guides already excluded in earlier attempts are skipped.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="match-guide" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_A2</bpmn:incoming>
+        <bpmn:outgoing>Flow_A3</bpmn:outgoing>
+      </bpmn:businessRuleTask>
+      <bpmn:exclusiveGateway id="Gw_GuideFound" name="Eligible guide found?" default="Flow_GuideNo">
+        <bpmn:documentation>F8 — exclusive: a match exists or not (default).</bpmn:documentation>
+        <bpmn:incoming>Flow_A3</bpmn:incoming>
+        <bpmn:outgoing>Flow_GuideYes</bpmn:outgoing>
+        <bpmn:outgoing>Flow_GuideNo</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:endEvent id="End_NoEligibleGuide" name="No eligible guide">
+        <bpmn:documentation>F8 — error end: throws NO_GUIDE to the boundary on the sub-process.</bpmn:documentation>
+        <bpmn:incoming>Flow_GuideNo</bpmn:incoming>
+        <bpmn:errorEventDefinition id="End_NoEligibleGuide_errorDef" errorRef="Err_NoGuide" />
+      </bpmn:endEvent>
+      <bpmn:serviceTask id="Task_HoldGuide" name="Place provisional hold on guide">
+        <bpmn:documentation>Reserves a slot in the guide's load so the same guide is not offered to two teams at once.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="hold-guide-slot" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_GuideYes</bpmn:incoming>
+        <bpmn:outgoing>Flow_A4</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:sendTask id="Task_SendRequest" name="Send allocation request">
+        <bpmn:documentation>Sends the proposal summary to the matched guide and asks for acceptance.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="send-allocation-request" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_A4</bpmn:incoming>
+        <bpmn:outgoing>Flow_A5</bpmn:outgoing>
+      </bpmn:sendTask>
+      <bpmn:eventBasedGateway id="Gw_GuideReply" name="Guide reply?">
+        <bpmn:documentation>Event-based gateway: whichever happens first — acceptance, decline, or 3 days of silence — decides the route.</bpmn:documentation>
+        <bpmn:incoming>Flow_A5</bpmn:incoming>
+        <bpmn:outgoing>Flow_A6</bpmn:outgoing>
+        <bpmn:outgoing>Flow_A7</bpmn:outgoing>
+        <bpmn:outgoing>Flow_A8</bpmn:outgoing>
+      </bpmn:eventBasedGateway>
+      <bpmn:intermediateCatchEvent id="Catch_Accepted" name="Guide accepted">
+        <bpmn:documentation>Guide formally accepts the team.</bpmn:documentation>
+        <bpmn:incoming>Flow_A6</bpmn:incoming>
+        <bpmn:outgoing>Flow_A9</bpmn:outgoing>
+        <bpmn:messageEventDefinition id="Catch_Accepted_messageDef" messageRef="Msg_GuideAccepted" />
+      </bpmn:intermediateCatchEvent>
+      <bpmn:endEvent id="End_GuideSecured" name="Guide secured">
+        <bpmn:documentation>Sub-process completes normally.</bpmn:documentation>
+        <bpmn:incoming>Flow_A9</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:intermediateCatchEvent id="Catch_Declined" name="Guide declined">
+        <bpmn:documentation>F9 — guide declines (workload, conflict of interest).</bpmn:documentation>
+        <bpmn:incoming>Flow_A7</bpmn:incoming>
+        <bpmn:outgoing>Flow_A10</bpmn:outgoing>
+        <bpmn:messageEventDefinition id="Catch_Declined_messageDef" messageRef="Msg_GuideDeclined" />
+      </bpmn:intermediateCatchEvent>
+      <bpmn:intermediateCatchEvent id="Catch_NoReply" name="No reply in 3 days">
+        <bpmn:documentation>F9 — guide is silent.</bpmn:documentation>
+        <bpmn:incoming>Flow_A8</bpmn:incoming>
+        <bpmn:outgoing>Flow_A11</bpmn:outgoing>
+        <bpmn:timerEventDefinition id="Catch_NoReply_timerDef">
+          <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P3D</bpmn:timeDuration>
+        </bpmn:timerEventDefinition>
+      </bpmn:intermediateCatchEvent>
+      <bpmn:exclusiveGateway id="Gw_NotSecured">
+        <bpmn:documentation>Merge: decline and silence are handled the same way.</bpmn:documentation>
+        <bpmn:incoming>Flow_A10</bpmn:incoming>
+        <bpmn:incoming>Flow_A11</bpmn:incoming>
+        <bpmn:outgoing>Flow_A12</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:serviceTask id="Task_ReleaseHold" name="Release provisional hold">
+        <bpmn:documentation>F9 — frees the slot reserved for the guide who declined or did not reply.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="release-guide-slot" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_A12</bpmn:incoming>
+        <bpmn:outgoing>Flow_A13</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:scriptTask id="Task_ExcludeGuide" name="Exclude guide and count attempt">
+        <bpmn:documentation>F9 — counts the failed attempt; the matching rule skips guides already tried.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:script expression="=if allocationAttempts = null then 1 else allocationAttempts + 1" resultVariable="allocationAttempts" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_A13</bpmn:incoming>
+        <bpmn:outgoing>Flow_A14</bpmn:outgoing>
+      </bpmn:scriptTask>
+      <bpmn:exclusiveGateway id="Gw_AttemptsLeft" name="Fewer than 3 attempts?" default="Flow_RetryNo">
+        <bpmn:documentation>F9 — bounded loop: at most 3 guides are approached automatically.</bpmn:documentation>
+        <bpmn:incoming>Flow_A14</bpmn:incoming>
+        <bpmn:outgoing>Flow_RetryYes</bpmn:outgoing>
+        <bpmn:outgoing>Flow_RetryNo</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:endEvent id="End_NoGuideSecured" name="No guide secured">
+        <bpmn:documentation>F9 — error end: throws NO_GUIDE after 3 failed attempts.</bpmn:documentation>
+        <bpmn:incoming>Flow_RetryNo</bpmn:incoming>
+        <bpmn:errorEventDefinition id="End_NoGuideSecured_errorDef" errorRef="Err_NoGuide" />
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_A1" sourceRef="Start_Alloc" targetRef="Gw_TryMerge" />
+      <bpmn:sequenceFlow id="Flow_A2" sourceRef="Gw_TryMerge" targetRef="Task_MatchGuide" />
+      <bpmn:sequenceFlow id="Flow_A3" sourceRef="Task_MatchGuide" targetRef="Gw_GuideFound" />
+      <bpmn:sequenceFlow id="Flow_GuideYes" name="Yes" sourceRef="Gw_GuideFound" targetRef="Task_HoldGuide">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=matchedGuide != null</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_GuideNo" name="No" sourceRef="Gw_GuideFound" targetRef="End_NoEligibleGuide" />
+      <bpmn:sequenceFlow id="Flow_A4" sourceRef="Task_HoldGuide" targetRef="Task_SendRequest" />
+      <bpmn:sequenceFlow id="Flow_A5" sourceRef="Task_SendRequest" targetRef="Gw_GuideReply" />
+      <bpmn:sequenceFlow id="Flow_A6" sourceRef="Gw_GuideReply" targetRef="Catch_Accepted" />
+      <bpmn:sequenceFlow id="Flow_A7" sourceRef="Gw_GuideReply" targetRef="Catch_Declined" />
+      <bpmn:sequenceFlow id="Flow_A8" sourceRef="Gw_GuideReply" targetRef="Catch_NoReply" />
+      <bpmn:sequenceFlow id="Flow_A9" sourceRef="Catch_Accepted" targetRef="End_GuideSecured" />
+      <bpmn:sequenceFlow id="Flow_A10" sourceRef="Catch_Declined" targetRef="Gw_NotSecured" />
+      <bpmn:sequenceFlow id="Flow_A11" sourceRef="Catch_NoReply" targetRef="Gw_NotSecured" />
+      <bpmn:sequenceFlow id="Flow_A12" sourceRef="Gw_NotSecured" targetRef="Task_ReleaseHold" />
+      <bpmn:sequenceFlow id="Flow_A13" sourceRef="Task_ReleaseHold" targetRef="Task_ExcludeGuide" />
+      <bpmn:sequenceFlow id="Flow_A14" sourceRef="Task_ExcludeGuide" targetRef="Gw_AttemptsLeft" />
+      <bpmn:sequenceFlow id="Flow_RetryYes" name="Yes" sourceRef="Gw_AttemptsLeft" targetRef="Gw_TryMerge">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=allocationAttempts &lt; 3</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_RetryNo" name="No" sourceRef="Gw_AttemptsLeft" targetRef="End_NoGuideSecured" />
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="Bnd_NoGuide" name="No guide available" cancelActivity="true" attachedToRef="Sub_Allocation">
+      <bpmn:documentation>F8 / F9 — catches NO_GUIDE and hands the case to the coordinator.</bpmn:documentation>
+      <bpmn:outgoing>Flow_NoGuide</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Bnd_NoGuide_errorDef" errorRef="Err_NoGuide" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Bnd_Withdrawal" name="Withdrawal received" cancelActivity="true" attachedToRef="Sub_Allocation">
+      <bpmn:documentation>F11 — interrupting message: the team dissolves or the approached guide goes on leave while allocation is running.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Withdrawn</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Bnd_Withdrawal_messageDef" messageRef="Msg_Withdrawal" />
+    </bpmn:boundaryEvent>
+    <bpmn:userTask id="Task_ManualAllocation" name="Arrange guide manually">
+      <bpmn:documentation>F8 / F9 — coordinator appoints a guide directly, adds a co-guide or external guide, or decides to wait for the next allocation round.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/arrange-guide-manually" />
+        <zeebe:assignmentDefinition candidateGroups="project-coordinator" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_NoGuide</bpmn:incoming>
+      <bpmn:outgoing>Flow_ManualDone</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_GuideArranged" name="Guide arranged?" default="Flow_ArrangedNo">
+      <bpmn:documentation>Exclusive: arranged, or wait-list (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_ManualDone</bpmn:incoming>
+      <bpmn:outgoing>Flow_ArrangedYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ArrangedNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="Catch_NextRound" name="Next allocation round">
+      <bpmn:documentation>F8 — wait-list: the team waits 7 days for guides to free up, then allocation is retried.</bpmn:documentation>
+      <bpmn:incoming>Flow_ArrangedNo</bpmn:incoming>
+      <bpmn:outgoing>Flow_RoundDue</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Catch_NextRound_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="Task_CloseAllocation" name="Cancel request and free guide slot">
+      <bpmn:documentation>F11 — withdraws any outstanding request and frees any slot held for this team.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="cancel-allocation" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Withdrawn</bpmn:incoming>
+      <bpmn:outgoing>Flow_Closed</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_WhoWithdrew" name="Who withdrew?" default="Flow_ByGuide">
+      <bpmn:documentation>Exclusive: team (process ends) or guide (re-allocate, default).</bpmn:documentation>
+      <bpmn:incoming>Flow_Closed</bpmn:incoming>
+      <bpmn:outgoing>Flow_ByTeam</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ByGuide</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_TeamWithdrawn" name="Team withdrawn">
+      <bpmn:documentation>Terminal: team dissolved after approval.</bpmn:documentation>
+      <bpmn:incoming>Flow_ByTeam</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gw_AllocatedMerge">
+      <bpmn:documentation>Merge: automatic and manual allocation.</bpmn:documentation>
+      <bpmn:incoming>Flow_Allocated</bpmn:incoming>
+      <bpmn:incoming>Flow_ArrangedYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToFinish</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:parallelGateway id="Gw_FinishSplit">
+      <bpmn:documentation>Parallel split: recording and notifying are independent.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToFinish</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToNotify</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ToRecord</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:sendTask id="Task_NotifyTeam" name="Notify team of allocation">
+      <bpmn:documentation>Sends the allocated guide details to the team. Retries 3 times; after the last retry the worker throws NOTIFY_FAILED.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="notify-allocation" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToNotify</bpmn:incoming>
+      <bpmn:outgoing>Flow_Notified</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:boundaryEvent id="Bnd_NotifyFailed" name="Notification failed" cancelActivity="true" attachedToRef="Task_NotifyTeam">
+      <bpmn:documentation>F10 — mail service down after all retries.</bpmn:documentation>
+      <bpmn:outgoing>Flow_NotifyFailed</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Bnd_NotifyFailed_errorDef" errorRef="Err_NotifyFailed" />
+    </bpmn:boundaryEvent>
+    <bpmn:userTask id="Task_ManualNotify" name="Inform team manually">
+      <bpmn:documentation>F10 — coordinator informs the team and guide by phone or notice board.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/inform-team-manually" />
+        <zeebe:assignmentDefinition candidateGroups="project-coordinator" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_NotifyFailed</bpmn:incoming>
+      <bpmn:outgoing>Flow_ManualNotified</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_NotifiedMerge">
+      <bpmn:documentation>Merge: automatic or manual notification.</bpmn:documentation>
+      <bpmn:incoming>Flow_Notified</bpmn:incoming>
+      <bpmn:incoming>Flow_ManualNotified</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyDone</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_RecordAllocation" name="Record allocation">
+      <bpmn:documentation>Writes team–guide allocation to the project register and updates guide load. Retries 3 times on a database error.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="record-allocation" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToRecord</bpmn:incoming>
+      <bpmn:outgoing>Flow_Recorded</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:parallelGateway id="Gw_FinishJoin">
+      <bpmn:documentation>Parallel join: both branches must finish.</bpmn:documentation>
+      <bpmn:incoming>Flow_NotifyDone</bpmn:incoming>
+      <bpmn:incoming>Flow_Recorded</bpmn:incoming>
+      <bpmn:outgoing>Flow_Finished</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:endEvent id="End_Allocated" name="Guide allocated">
+      <bpmn:documentation>Successful end: guide confirmed, team notified, allocation recorded.</bpmn:documentation>
+      <bpmn:incoming>Flow_Finished</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start" sourceRef="Start_ProposalIntent" targetRef="Gw_SubmitMerge" />
+    <bpmn:sequenceFlow id="Flow_ToSubmit" sourceRef="Gw_SubmitMerge" targetRef="Task_SubmitProposal" />
+    <bpmn:sequenceFlow id="Flow_Submitted" sourceRef="Task_SubmitProposal" targetRef="Task_ValidateProposal" />
+    <bpmn:sequenceFlow id="Flow_Deadline" sourceRef="Bnd_SubmissionDeadline" targetRef="Task_DecideLateRequest" />
+    <bpmn:sequenceFlow id="Flow_LateDecided" sourceRef="Task_DecideLateRequest" targetRef="Gw_LateAllowed" />
+    <bpmn:sequenceFlow id="Flow_LateYes" name="Yes" sourceRef="Gw_LateAllowed" targetRef="Gw_SubmitMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=lateAllowed = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_LateNo" name="No" sourceRef="Gw_LateAllowed" targetRef="End_Lapsed" />
+    <bpmn:sequenceFlow id="Flow_Validated" sourceRef="Task_ValidateProposal" targetRef="Gw_ValidationResult" />
+    <bpmn:sequenceFlow id="Flow_Valid" name="Valid" sourceRef="Gw_ValidationResult" targetRef="Gw_ScreenMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=validation = "VALID"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_TeamInvalid" name="Team rule broken" sourceRef="Gw_ValidationResult" targetRef="Task_NotifyInvalidTeam">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=validation = "TEAM_RULE"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Incomplete" name="Incomplete" sourceRef="Gw_ValidationResult" targetRef="Gw_CorrectionsLeft" />
+    <bpmn:sequenceFlow id="Flow_InvalidNotified" sourceRef="Task_NotifyInvalidTeam" targetRef="End_InvalidTeam" />
+    <bpmn:sequenceFlow id="Flow_CorrYes" name="Yes" sourceRef="Gw_CorrectionsLeft" targetRef="Task_ReturnErrors">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=validationAttempts &lt; 2</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_CorrNo" name="No" sourceRef="Gw_CorrectionsLeft" targetRef="Task_ResolveValidation" />
+    <bpmn:sequenceFlow id="Flow_ErrorsReturned" sourceRef="Task_ReturnErrors" targetRef="Gw_SubmitMerge" />
+    <bpmn:sequenceFlow id="Flow_Resolved" sourceRef="Task_ResolveValidation" targetRef="Gw_ScreenMerge" />
+    <bpmn:sequenceFlow id="Flow_ToScreenSplit" sourceRef="Gw_ScreenMerge" targetRef="Gw_ScreenSplit" />
+    <bpmn:sequenceFlow id="Flow_ToScreen" sourceRef="Gw_ScreenSplit" targetRef="Task_ScreenProposal" />
+    <bpmn:sequenceFlow id="Flow_ToSimilarity" sourceRef="Gw_ScreenSplit" targetRef="Task_SimilarityCheck" />
+    <bpmn:sequenceFlow id="Flow_Screened" sourceRef="Task_ScreenProposal" targetRef="Gw_ScreenJoin" />
+    <bpmn:sequenceFlow id="Flow_SimChecked" sourceRef="Task_SimilarityCheck" targetRef="Gw_ScreenJoin" />
+    <bpmn:sequenceFlow id="Flow_Joined" sourceRef="Gw_ScreenJoin" targetRef="Gw_Similarity" />
+    <bpmn:sequenceFlow id="Flow_SimHigh" name="Yes" sourceRef="Gw_Similarity" targetRef="Task_ReviewMatch">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=similarityScore &gt; similarityThreshold</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_SimLow" name="No" sourceRef="Gw_Similarity" targetRef="Gw_CommitteeMerge" />
+    <bpmn:sequenceFlow id="Flow_MatchReviewed" sourceRef="Task_ReviewMatch" targetRef="Gw_MatchVerdict" />
+    <bpmn:sequenceFlow id="Flow_Duplicate" name="Duplicate" sourceRef="Gw_MatchVerdict" targetRef="Gw_RejectMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=overlap = "DUPLICATE"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Partial" name="Modify topic" sourceRef="Gw_MatchVerdict" targetRef="Gw_SubmitMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=overlap = "PARTIAL"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_FalsePositive" name="False positive" sourceRef="Gw_MatchVerdict" targetRef="Gw_CommitteeMerge" />
+    <bpmn:sequenceFlow id="Flow_ToEvaluate" sourceRef="Gw_CommitteeMerge" targetRef="Task_EvaluateProposal" />
+    <bpmn:sequenceFlow id="Flow_Evaluated" sourceRef="Task_EvaluateProposal" targetRef="Gw_CommitteeDecision" />
+    <bpmn:sequenceFlow id="Flow_Remind" sourceRef="Bnd_ReviewReminder" targetRef="Task_ChaseCommittee" />
+    <bpmn:sequenceFlow id="Flow_Chased" sourceRef="Task_ChaseCommittee" targetRef="End_ReminderSent" />
+    <bpmn:sequenceFlow id="Flow_Overdue" sourceRef="Bnd_ReviewOverdue" targetRef="Task_HoDExpedite" />
+    <bpmn:sequenceFlow id="Flow_Expedited" sourceRef="Task_HoDExpedite" targetRef="End_Escalated" />
+    <bpmn:sequenceFlow id="Flow_Approve" name="Approve" sourceRef="Gw_CommitteeDecision" targetRef="Gw_AllocMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=committeeDecision = "APPROVE"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Revise" name="Revise" sourceRef="Gw_CommitteeDecision" targetRef="Gw_RevisionsLeft">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=committeeDecision = "REVISE"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Reject" name="Reject" sourceRef="Gw_CommitteeDecision" targetRef="Gw_RejectMerge" />
+    <bpmn:sequenceFlow id="Flow_RevYes" name="Yes" sourceRef="Gw_RevisionsLeft" targetRef="Task_ReviseProposal">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=revisionCount = null or revisionCount &lt; 2</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_RevNo" name="No" sourceRef="Gw_RevisionsLeft" targetRef="Task_FinalDecision" />
+    <bpmn:sequenceFlow id="Flow_Revised" sourceRef="Task_ReviseProposal" targetRef="Gw_CommitteeMerge" />
+    <bpmn:sequenceFlow id="Flow_RevTimeout" sourceRef="Bnd_RevisionTimeout" targetRef="End_RevisionLapsed" />
+    <bpmn:sequenceFlow id="Flow_FinalRecorded" sourceRef="Task_FinalDecision" targetRef="Gw_FinalDecision" />
+    <bpmn:sequenceFlow id="Flow_FinalApprove" name="Approve" sourceRef="Gw_FinalDecision" targetRef="Gw_AllocMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=committeeDecision = "APPROVE"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_FinalReject" name="Reject" sourceRef="Gw_FinalDecision" targetRef="Gw_RejectMerge" />
+    <bpmn:sequenceFlow id="Flow_ToRejection" sourceRef="Gw_RejectMerge" targetRef="Task_SendRejection" />
+    <bpmn:sequenceFlow id="Flow_RejectionSent" sourceRef="Task_SendRejection" targetRef="Gw_NewTopicAllowed" />
+    <bpmn:sequenceFlow id="Flow_NewTopicYes" name="Yes" sourceRef="Gw_NewTopicAllowed" targetRef="Gw_SubmitMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=rejections &lt; 2</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NewTopicNo" name="No" sourceRef="Gw_NewTopicAllowed" targetRef="End_Rejected" />
+    <bpmn:sequenceFlow id="Flow_ToAllocation" sourceRef="Gw_AllocMerge" targetRef="Sub_Allocation" />
+    <bpmn:sequenceFlow id="Flow_Allocated" sourceRef="Sub_Allocation" targetRef="Gw_AllocatedMerge" />
+    <bpmn:sequenceFlow id="Flow_NoGuide" sourceRef="Bnd_NoGuide" targetRef="Task_ManualAllocation" />
+    <bpmn:sequenceFlow id="Flow_ManualDone" sourceRef="Task_ManualAllocation" targetRef="Gw_GuideArranged" />
+    <bpmn:sequenceFlow id="Flow_ArrangedYes" name="Yes" sourceRef="Gw_GuideArranged" targetRef="Gw_AllocatedMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=guideArranged = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ArrangedNo" name="Wait-list" sourceRef="Gw_GuideArranged" targetRef="Catch_NextRound" />
+    <bpmn:sequenceFlow id="Flow_RoundDue" sourceRef="Catch_NextRound" targetRef="Gw_AllocMerge" />
+    <bpmn:sequenceFlow id="Flow_Withdrawn" sourceRef="Bnd_Withdrawal" targetRef="Task_CloseAllocation" />
+    <bpmn:sequenceFlow id="Flow_Closed" sourceRef="Task_CloseAllocation" targetRef="Gw_WhoWithdrew" />
+    <bpmn:sequenceFlow id="Flow_ByTeam" name="Team" sourceRef="Gw_WhoWithdrew" targetRef="End_TeamWithdrawn">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=withdrawnBy = "TEAM"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ByGuide" name="Guide" sourceRef="Gw_WhoWithdrew" targetRef="Gw_AllocMerge" />
+    <bpmn:sequenceFlow id="Flow_ToFinish" sourceRef="Gw_AllocatedMerge" targetRef="Gw_FinishSplit" />
+    <bpmn:sequenceFlow id="Flow_ToNotify" sourceRef="Gw_FinishSplit" targetRef="Task_NotifyTeam" />
+    <bpmn:sequenceFlow id="Flow_ToRecord" sourceRef="Gw_FinishSplit" targetRef="Task_RecordAllocation" />
+    <bpmn:sequenceFlow id="Flow_Notified" sourceRef="Task_NotifyTeam" targetRef="Gw_NotifiedMerge" />
+    <bpmn:sequenceFlow id="Flow_NotifyFailed" sourceRef="Bnd_NotifyFailed" targetRef="Task_ManualNotify" />
+    <bpmn:sequenceFlow id="Flow_ManualNotified" sourceRef="Task_ManualNotify" targetRef="Gw_NotifiedMerge" />
+    <bpmn:sequenceFlow id="Flow_NotifyDone" sourceRef="Gw_NotifiedMerge" targetRef="Gw_FinishJoin" />
+    <bpmn:sequenceFlow id="Flow_Recorded" sourceRef="Task_RecordAllocation" targetRef="Gw_FinishJoin" />
+    <bpmn:sequenceFlow id="Flow_Finished" sourceRef="Gw_FinishJoin" targetRef="End_Allocated" />
+  </bpmn:process>
+  <bpmn:message id="Msg_GuideAccepted" name="guide-accepted">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=proposalId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_GuideDeclined" name="guide-declined">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=proposalId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_Withdrawal" name="allocation-withdrawal">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=proposalId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:error id="Err_NoGuide" name="No guide available" errorCode="NO_GUIDE" />
+  <bpmn:error id="Err_NotifyFailed" name="Notification failed" errorCode="NOTIFY_FAILED" />
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_student-project-allocation">
+      <bpmndi:BPMNShape id="Participant_Main_di" bpmnElement="Participant_Main" isHorizontal="true">
+        <dc:Bounds x="100" y="60" width="5758" height="1430" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Student_di" bpmnElement="Lane_Student" isHorizontal="true">
+        <dc:Bounds x="130" y="60" width="5728" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Committee_di" bpmnElement="Lane_Committee" isHorizontal="true">
+        <dc:Bounds x="130" y="320" width="5728" height="390" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Coordinator_di" bpmnElement="Lane_Coordinator" isHorizontal="true">
+        <dc:Bounds x="130" y="710" width="5728" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_System_di" bpmnElement="Lane_System" isHorizontal="true">
+        <dc:Bounds x="130" y="970" width="5728" height="520" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_Guide_di" bpmnElement="Participant_Guide" isHorizontal="true" isExpanded="false">
+        <dc:Bounds x="100" y="1540" width="5758" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Allocation_di" bpmnElement="Sub_Allocation" isExpanded="true">
+        <dc:Bounds x="3017" y="978" width="1763" height="374" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_ProposalIntent_di" bpmnElement="Start_ProposalIntent">
+        <dc:Bounds x="202" y="107" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="175" y="147" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_SubmitMerge_di" bpmnElement="Gw_SubmitMerge">
+        <dc:Bounds x="345" y="100" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SubmitProposal_di" bpmnElement="Task_SubmitProposal">
+        <dc:Bounds x="470" y="85" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_DecideLateRequest_di" bpmnElement="Task_DecideLateRequest">
+        <dc:Bounds x="470" y="735" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_LateAllowed_di" bpmnElement="Gw_LateAllowed">
+        <dc:Bounds x="645" y="750" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="699" y="728" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Lapsed_di" bpmnElement="End_Lapsed">
+        <dc:Bounds x="652" y="887" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="625" y="927" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ValidateProposal_di" bpmnElement="Task_ValidateProposal">
+        <dc:Bounds x="620" y="995" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_ValidationResult_di" bpmnElement="Gw_ValidationResult">
+        <dc:Bounds x="795" y="1010" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="788" y="978" width="63" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NotifyInvalidTeam_di" bpmnElement="Task_NotifyInvalidTeam">
+        <dc:Bounds x="920" y="1125" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_InvalidTeam_di" bpmnElement="End_InvalidTeam">
+        <dc:Bounds x="1102" y="1147" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1076" y="1187" width="87" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_CorrectionsLeft_di" bpmnElement="Gw_CorrectionsLeft">
+        <dc:Bounds x="795" y="1270" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="776" y="1238" width="87" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReturnErrors_di" bpmnElement="Task_ReturnErrors">
+        <dc:Bounds x="920" y="1255" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ResolveValidation_di" bpmnElement="Task_ResolveValidation">
+        <dc:Bounds x="770" y="865" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_ScreenMerge_di" bpmnElement="Gw_ScreenMerge">
+        <dc:Bounds x="945" y="1010" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_ScreenSplit_di" bpmnElement="Gw_ScreenSplit">
+        <dc:Bounds x="1095" y="1010" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ScreenProposal_di" bpmnElement="Task_ScreenProposal">
+        <dc:Bounds x="1220" y="735" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SimilarityCheck_di" bpmnElement="Task_SimilarityCheck">
+        <dc:Bounds x="1220" y="995" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_ScreenJoin_di" bpmnElement="Gw_ScreenJoin">
+        <dc:Bounds x="1395" y="1010" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Similarity_di" bpmnElement="Gw_Similarity">
+        <dc:Bounds x="1545" y="1010" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1538" y="1064" width="63" height="42" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReviewMatch_di" bpmnElement="Task_ReviewMatch">
+        <dc:Bounds x="1670" y="735" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_MatchVerdict_di" bpmnElement="Gw_MatchVerdict">
+        <dc:Bounds x="1845" y="750" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1899" y="728" width="51" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_CommitteeMerge_di" bpmnElement="Gw_CommitteeMerge">
+        <dc:Bounds x="1995" y="490" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_EvaluateProposal_di" bpmnElement="Task_EvaluateProposal">
+        <dc:Bounds x="2120" y="475" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ChaseCommittee_di" bpmnElement="Task_ChaseCommittee">
+        <dc:Bounds x="2120" y="735" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_ReminderSent_di" bpmnElement="End_ReminderSent">
+        <dc:Bounds x="2302" y="757" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2280" y="797" width="81" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_HoDExpedite_di" bpmnElement="Task_HoDExpedite">
+        <dc:Bounds x="2232" y="345" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Escalated_di" bpmnElement="End_Escalated">
+        <dc:Bounds x="2414" y="367" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2401" y="407" width="63" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_CommitteeDecision_di" bpmnElement="Gw_CommitteeDecision">
+        <dc:Bounds x="2445" y="490" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2499" y="468" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_RevisionsLeft_di" bpmnElement="Gw_RevisionsLeft">
+        <dc:Bounds x="2445" y="620" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2425" y="588" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReviseProposal_di" bpmnElement="Task_ReviseProposal">
+        <dc:Bounds x="2420" y="215" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_RevisionLapsed_di" bpmnElement="End_RevisionLapsed">
+        <dc:Bounds x="2602" y="107" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2575" y="147" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_FinalDecision_di" bpmnElement="Task_FinalDecision">
+        <dc:Bounds x="2570" y="605" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_FinalDecision_di" bpmnElement="Gw_FinalDecision">
+        <dc:Bounds x="2745" y="620" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2726" y="602" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_RejectMerge_di" bpmnElement="Gw_RejectMerge">
+        <dc:Bounds x="2145" y="1400" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendRejection_di" bpmnElement="Task_SendRejection">
+        <dc:Bounds x="2270" y="1385" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_NewTopicAllowed_di" bpmnElement="Gw_NewTopicAllowed">
+        <dc:Bounds x="2445" y="1400" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2499" y="1378" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Rejected_di" bpmnElement="End_Rejected">
+        <dc:Bounds x="2602" y="1407" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2594" y="1375" width="51" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_AllocMerge_di" bpmnElement="Gw_AllocMerge">
+        <dc:Bounds x="2895" y="1140" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ManualAllocation_di" bpmnElement="Task_ManualAllocation">
+        <dc:Bounds x="3095" y="865" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_GuideArranged_di" bpmnElement="Gw_GuideArranged">
+        <dc:Bounds x="3270" y="880" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3250" y="862" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_NextRound_di" bpmnElement="Catch_NextRound">
+        <dc:Bounds x="3427" y="887" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3467" y="865" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CloseAllocation_di" bpmnElement="Task_CloseAllocation">
+        <dc:Bounds x="4370" y="1385" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_WhoWithdrew_di" bpmnElement="Gw_WhoWithdrew">
+        <dc:Bounds x="4545" y="1400" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4530" y="1454" width="81" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_TeamWithdrawn_di" bpmnElement="End_TeamWithdrawn">
+        <dc:Bounds x="4702" y="1407" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4676" y="1447" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_AllocatedMerge_di" bpmnElement="Gw_AllocatedMerge">
+        <dc:Bounds x="4995" y="1140" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_FinishSplit_di" bpmnElement="Gw_FinishSplit">
+        <dc:Bounds x="5145" y="1140" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NotifyTeam_di" bpmnElement="Task_NotifyTeam">
+        <dc:Bounds x="5270" y="995" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ManualNotify_di" bpmnElement="Task_ManualNotify">
+        <dc:Bounds x="5270" y="865" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_NotifiedMerge_di" bpmnElement="Gw_NotifiedMerge">
+        <dc:Bounds x="5445" y="1010" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RecordAllocation_di" bpmnElement="Task_RecordAllocation">
+        <dc:Bounds x="5270" y="1255" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_FinishJoin_di" bpmnElement="Gw_FinishJoin">
+        <dc:Bounds x="5595" y="1140" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Allocated_di" bpmnElement="End_Allocated">
+        <dc:Bounds x="5752" y="1147" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5725" y="1187" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_SubmissionDeadline_di" bpmnElement="Bnd_SubmissionDeadline">
+        <dc:Bounds x="502" y="147" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="408" y="179" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_ReviewReminder_di" bpmnElement="Bnd_ReviewReminder">
+        <dc:Bounds x="2127" y="537" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2036" y="569" width="87" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_ReviewOverdue_di" bpmnElement="Bnd_ReviewOverdue">
+        <dc:Bounds x="2177" y="457" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2217" y="435" width="81" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_RevisionTimeout_di" bpmnElement="Bnd_RevisionTimeout">
+        <dc:Bounds x="2452" y="197" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2492" y="175" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_NoGuide_di" bpmnElement="Bnd_NoGuide">
+        <dc:Bounds x="3140" y="960" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3130" y="1000" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_Withdrawal_di" bpmnElement="Bnd_Withdrawal">
+        <dc:Bounds x="4312" y="1334" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4299" y="1302" width="63" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_NotifyFailed_di" bpmnElement="Bnd_NotifyFailed">
+        <dc:Bounds x="5302" y="977" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5342" y="955" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Alloc_di" bpmnElement="Start_Alloc">
+        <dc:Bounds x="3052" y="1147" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3038" y="1187" width="63" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_TryMerge_di" bpmnElement="Gw_TryMerge">
+        <dc:Bounds x="3195" y="1140" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_MatchGuide_di" bpmnElement="Task_MatchGuide">
+        <dc:Bounds x="3320" y="1125" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_GuideFound_di" bpmnElement="Gw_GuideFound">
+        <dc:Bounds x="3495" y="1140" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3476" y="1194" width="87" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_NoEligibleGuide_di" bpmnElement="End_NoEligibleGuide">
+        <dc:Bounds x="3502" y="1017" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3486" y="985" width="69" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_HoldGuide_di" bpmnElement="Task_HoldGuide">
+        <dc:Bounds x="3620" y="1125" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendRequest_di" bpmnElement="Task_SendRequest">
+        <dc:Bounds x="3770" y="1125" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_GuideReply_di" bpmnElement="Gw_GuideReply">
+        <dc:Bounds x="3945" y="1140" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3999" y="1132" width="75" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_Accepted_di" bpmnElement="Catch_Accepted">
+        <dc:Bounds x="4102" y="1017" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4076" y="1057" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_GuideSecured_di" bpmnElement="End_GuideSecured">
+        <dc:Bounds x="4252" y="1017" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4230" y="1057" width="81" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_Declined_di" bpmnElement="Catch_Declined">
+        <dc:Bounds x="4102" y="1277" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4076" y="1317" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_NoReply_di" bpmnElement="Catch_NoReply">
+        <dc:Bounds x="4102" y="1147" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4080" y="1115" width="81" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_NotSecured_di" bpmnElement="Gw_NotSecured">
+        <dc:Bounds x="4245" y="1140" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReleaseHold_di" bpmnElement="Task_ReleaseHold">
+        <dc:Bounds x="4370" y="1125" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ExcludeGuide_di" bpmnElement="Task_ExcludeGuide">
+        <dc:Bounds x="4520" y="1125" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_AttemptsLeft_di" bpmnElement="Gw_AttemptsLeft">
+        <dc:Bounds x="4695" y="1140" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4682" y="1108" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_NoGuideSecured_di" bpmnElement="End_NoGuideSecured">
+        <dc:Bounds x="4702" y="1017" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4694" y="985" width="51" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Start_di" bpmnElement="Flow_Start">
+        <di:waypoint x="238" y="125" />
+        <di:waypoint x="345" y="125" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToSubmit_di" bpmnElement="Flow_ToSubmit">
+        <di:waypoint x="395" y="125" />
+        <di:waypoint x="470" y="125" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Submitted_di" bpmnElement="Flow_Submitted">
+        <di:waypoint x="570" y="125" />
+        <di:waypoint x="592" y="125" />
+        <di:waypoint x="592" y="1035" />
+        <di:waypoint x="620" y="1035" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Deadline_di" bpmnElement="Flow_Deadline">
+        <di:waypoint x="520" y="183" />
+        <di:waypoint x="520" y="735" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_LateDecided_di" bpmnElement="Flow_LateDecided">
+        <di:waypoint x="570" y="775" />
+        <di:waypoint x="645" y="775" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_LateYes_di" bpmnElement="Flow_LateYes">
+        <di:waypoint x="670" y="750" />
+        <di:waypoint x="670" y="80" />
+        <di:waypoint x="370" y="80" />
+        <di:waypoint x="370" y="100" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="675" y="730" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_LateNo_di" bpmnElement="Flow_LateNo">
+        <di:waypoint x="670" y="800" />
+        <di:waypoint x="670" y="887" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="675" y="806" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Validated_di" bpmnElement="Flow_Validated">
+        <di:waypoint x="720" y="1035" />
+        <di:waypoint x="795" y="1035" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Valid_di" bpmnElement="Flow_Valid">
+        <di:waypoint x="845" y="1035" />
+        <di:waypoint x="945" y="1035" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="855" y="1018" width="34" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_TeamInvalid_di" bpmnElement="Flow_TeamInvalid">
+        <di:waypoint x="820" y="1060" />
+        <di:waypoint x="820" y="1165" />
+        <di:waypoint x="920" y="1165" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="825" y="1066" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Incomplete_di" bpmnElement="Flow_Incomplete">
+        <di:waypoint x="820" y="1060" />
+        <di:waypoint x="820" y="1270" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="752" y="1066" width="63" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_InvalidNotified_di" bpmnElement="Flow_InvalidNotified">
+        <di:waypoint x="1020" y="1165" />
+        <di:waypoint x="1102" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CorrYes_di" bpmnElement="Flow_CorrYes">
+        <di:waypoint x="845" y="1295" />
+        <di:waypoint x="920" y="1295" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="855" y="1278" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CorrNo_di" bpmnElement="Flow_CorrNo">
+        <di:waypoint x="820" y="1320" />
+        <di:waypoint x="820" y="1334" />
+        <di:waypoint x="748" y="1334" />
+        <di:waypoint x="748" y="905" />
+        <di:waypoint x="770" y="905" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="825" y="1326" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ErrorsReturned_di" bpmnElement="Flow_ErrorsReturned">
+        <di:waypoint x="970" y="1335" />
+        <di:waypoint x="970" y="1346" />
+        <di:waypoint x="370" y="1346" />
+        <di:waypoint x="370" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Resolved_di" bpmnElement="Flow_Resolved">
+        <di:waypoint x="870" y="905" />
+        <di:waypoint x="970" y="905" />
+        <di:waypoint x="970" y="1010" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToScreenSplit_di" bpmnElement="Flow_ToScreenSplit">
+        <di:waypoint x="995" y="1035" />
+        <di:waypoint x="1095" y="1035" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToScreen_di" bpmnElement="Flow_ToScreen">
+        <di:waypoint x="1120" y="1010" />
+        <di:waypoint x="1120" y="775" />
+        <di:waypoint x="1220" y="775" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToSimilarity_di" bpmnElement="Flow_ToSimilarity">
+        <di:waypoint x="1145" y="1035" />
+        <di:waypoint x="1220" y="1035" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Screened_di" bpmnElement="Flow_Screened">
+        <di:waypoint x="1320" y="775" />
+        <di:waypoint x="1420" y="775" />
+        <di:waypoint x="1420" y="1010" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SimChecked_di" bpmnElement="Flow_SimChecked">
+        <di:waypoint x="1320" y="1035" />
+        <di:waypoint x="1395" y="1035" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Joined_di" bpmnElement="Flow_Joined">
+        <di:waypoint x="1445" y="1035" />
+        <di:waypoint x="1545" y="1035" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SimHigh_di" bpmnElement="Flow_SimHigh">
+        <di:waypoint x="1570" y="1010" />
+        <di:waypoint x="1570" y="775" />
+        <di:waypoint x="1670" y="775" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1575" y="990" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SimLow_di" bpmnElement="Flow_SimLow">
+        <di:waypoint x="1595" y="1035" />
+        <di:waypoint x="1617" y="1035" />
+        <di:waypoint x="1617" y="515" />
+        <di:waypoint x="1995" y="515" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1605" y="1039" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_MatchReviewed_di" bpmnElement="Flow_MatchReviewed">
+        <di:waypoint x="1770" y="775" />
+        <di:waypoint x="1845" y="775" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Duplicate_di" bpmnElement="Flow_Duplicate">
+        <di:waypoint x="1870" y="800" />
+        <di:waypoint x="1870" y="1425" />
+        <di:waypoint x="2145" y="1425" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1875" y="806" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Partial_di" bpmnElement="Flow_Partial">
+        <di:waypoint x="1870" y="750" />
+        <di:waypoint x="1870" y="74" />
+        <di:waypoint x="370" y="74" />
+        <di:waypoint x="370" y="100" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1790" y="730" width="75" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FalsePositive_di" bpmnElement="Flow_FalsePositive">
+        <di:waypoint x="1895" y="775" />
+        <di:waypoint x="2020" y="775" />
+        <di:waypoint x="2020" y="540" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2025" y="739" width="51" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToEvaluate_di" bpmnElement="Flow_ToEvaluate">
+        <di:waypoint x="2045" y="515" />
+        <di:waypoint x="2120" y="515" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Evaluated_di" bpmnElement="Flow_Evaluated">
+        <di:waypoint x="2220" y="515" />
+        <di:waypoint x="2445" y="515" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Remind_di" bpmnElement="Flow_Remind">
+        <di:waypoint x="2145" y="573" />
+        <di:waypoint x="2145" y="593" />
+        <di:waypoint x="2170" y="593" />
+        <di:waypoint x="2170" y="735" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Chased_di" bpmnElement="Flow_Chased">
+        <di:waypoint x="2220" y="775" />
+        <di:waypoint x="2302" y="775" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Overdue_di" bpmnElement="Flow_Overdue">
+        <di:waypoint x="2195" y="457" />
+        <di:waypoint x="2195" y="385" />
+        <di:waypoint x="2232" y="385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Expedited_di" bpmnElement="Flow_Expedited">
+        <di:waypoint x="2332" y="385" />
+        <di:waypoint x="2414" y="385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Approve_di" bpmnElement="Flow_Approve">
+        <di:waypoint x="2495" y="515" />
+        <di:waypoint x="2517" y="515" />
+        <di:waypoint x="2517" y="1165" />
+        <di:waypoint x="2895" y="1165" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2505" y="498" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Revise_di" bpmnElement="Flow_Revise">
+        <di:waypoint x="2470" y="540" />
+        <di:waypoint x="2470" y="620" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2475" y="546" width="39" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Reject_di" bpmnElement="Flow_Reject">
+        <di:waypoint x="2470" y="490" />
+        <di:waypoint x="2470" y="476" />
+        <di:waypoint x="2377" y="476" />
+        <di:waypoint x="2377" y="1378" />
+        <di:waypoint x="2170" y="1378" />
+        <di:waypoint x="2170" y="1400" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2475" y="450" width="39" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RevYes_di" bpmnElement="Flow_RevYes">
+        <di:waypoint x="2470" y="670" />
+        <di:waypoint x="2470" y="684" />
+        <di:waypoint x="2398" y="684" />
+        <di:waypoint x="2398" y="255" />
+        <di:waypoint x="2420" y="255" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2475" y="676" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RevNo_di" bpmnElement="Flow_RevNo">
+        <di:waypoint x="2495" y="645" />
+        <di:waypoint x="2570" y="645" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2525" y="628" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Revised_di" bpmnElement="Flow_Revised">
+        <di:waypoint x="2470" y="295" />
+        <di:waypoint x="2470" y="306" />
+        <di:waypoint x="2020" y="306" />
+        <di:waypoint x="2020" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RevTimeout_di" bpmnElement="Flow_RevTimeout">
+        <di:waypoint x="2470" y="197" />
+        <di:waypoint x="2470" y="125" />
+        <di:waypoint x="2602" y="125" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FinalRecorded_di" bpmnElement="Flow_FinalRecorded">
+        <di:waypoint x="2670" y="645" />
+        <di:waypoint x="2745" y="645" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FinalApprove_di" bpmnElement="Flow_FinalApprove">
+        <di:waypoint x="2795" y="645" />
+        <di:waypoint x="2920" y="645" />
+        <di:waypoint x="2920" y="1140" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2805" y="628" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FinalReject_di" bpmnElement="Flow_FinalReject">
+        <di:waypoint x="2770" y="670" />
+        <di:waypoint x="2770" y="1470" />
+        <di:waypoint x="2170" y="1470" />
+        <di:waypoint x="2170" y="1450" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2775" y="676" width="39" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToRejection_di" bpmnElement="Flow_ToRejection">
+        <di:waypoint x="2195" y="1425" />
+        <di:waypoint x="2270" y="1425" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RejectionSent_di" bpmnElement="Flow_RejectionSent">
+        <di:waypoint x="2370" y="1425" />
+        <di:waypoint x="2445" y="1425" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NewTopicYes_di" bpmnElement="Flow_NewTopicYes">
+        <di:waypoint x="2470" y="1400" />
+        <di:waypoint x="2470" y="1360" />
+        <di:waypoint x="370" y="1360" />
+        <di:waypoint x="370" y="150" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2475" y="1380" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NewTopicNo_di" bpmnElement="Flow_NewTopicNo">
+        <di:waypoint x="2495" y="1425" />
+        <di:waypoint x="2602" y="1425" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2505" y="1408" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToAllocation_di" bpmnElement="Flow_ToAllocation">
+        <di:waypoint x="2945" y="1165" />
+        <di:waypoint x="3017" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A1_di" bpmnElement="Flow_A1">
+        <di:waypoint x="3088" y="1165" />
+        <di:waypoint x="3195" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A2_di" bpmnElement="Flow_A2">
+        <di:waypoint x="3245" y="1165" />
+        <di:waypoint x="3320" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A3_di" bpmnElement="Flow_A3">
+        <di:waypoint x="3420" y="1165" />
+        <di:waypoint x="3495" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GuideYes_di" bpmnElement="Flow_GuideYes">
+        <di:waypoint x="3545" y="1165" />
+        <di:waypoint x="3620" y="1165" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3555" y="1148" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GuideNo_di" bpmnElement="Flow_GuideNo">
+        <di:waypoint x="3520" y="1140" />
+        <di:waypoint x="3520" y="1053" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3525" y="1120" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A4_di" bpmnElement="Flow_A4">
+        <di:waypoint x="3720" y="1165" />
+        <di:waypoint x="3770" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A5_di" bpmnElement="Flow_A5">
+        <di:waypoint x="3870" y="1165" />
+        <di:waypoint x="3945" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A6_di" bpmnElement="Flow_A6">
+        <di:waypoint x="3970" y="1140" />
+        <di:waypoint x="3970" y="1035" />
+        <di:waypoint x="4102" y="1035" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A7_di" bpmnElement="Flow_A7">
+        <di:waypoint x="3970" y="1190" />
+        <di:waypoint x="3970" y="1295" />
+        <di:waypoint x="4102" y="1295" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A8_di" bpmnElement="Flow_A8">
+        <di:waypoint x="3995" y="1165" />
+        <di:waypoint x="4102" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A9_di" bpmnElement="Flow_A9">
+        <di:waypoint x="4138" y="1035" />
+        <di:waypoint x="4252" y="1035" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A10_di" bpmnElement="Flow_A10">
+        <di:waypoint x="4138" y="1295" />
+        <di:waypoint x="4270" y="1295" />
+        <di:waypoint x="4270" y="1190" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A11_di" bpmnElement="Flow_A11">
+        <di:waypoint x="4138" y="1165" />
+        <di:waypoint x="4245" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A12_di" bpmnElement="Flow_A12">
+        <di:waypoint x="4295" y="1165" />
+        <di:waypoint x="4370" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A13_di" bpmnElement="Flow_A13">
+        <di:waypoint x="4470" y="1165" />
+        <di:waypoint x="4520" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_A14_di" bpmnElement="Flow_A14">
+        <di:waypoint x="4620" y="1165" />
+        <di:waypoint x="4695" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RetryYes_di" bpmnElement="Flow_RetryYes">
+        <di:waypoint x="4720" y="1190" />
+        <di:waypoint x="4720" y="1210" />
+        <di:waypoint x="3220" y="1210" />
+        <di:waypoint x="3220" y="1190" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4725" y="1196" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RetryNo_di" bpmnElement="Flow_RetryNo">
+        <di:waypoint x="4720" y="1140" />
+        <di:waypoint x="4720" y="1053" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4725" y="1120" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Allocated_di" bpmnElement="Flow_Allocated">
+        <di:waypoint x="4780" y="1165" />
+        <di:waypoint x="4995" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NoGuide_di" bpmnElement="Flow_NoGuide">
+        <di:waypoint x="3158" y="960" />
+        <di:waypoint x="3158" y="854" />
+        <di:waypoint x="3145" y="854" />
+        <di:waypoint x="3145" y="865" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ManualDone_di" bpmnElement="Flow_ManualDone">
+        <di:waypoint x="3195" y="905" />
+        <di:waypoint x="3270" y="905" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ArrangedYes_di" bpmnElement="Flow_ArrangedYes">
+        <di:waypoint x="3295" y="930" />
+        <di:waypoint x="3295" y="944" />
+        <di:waypoint x="5020" y="944" />
+        <di:waypoint x="5020" y="1140" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3268" y="936" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ArrangedNo_di" bpmnElement="Flow_ArrangedNo">
+        <di:waypoint x="3320" y="905" />
+        <di:waypoint x="3427" y="905" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3330" y="888" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RoundDue_di" bpmnElement="Flow_RoundDue">
+        <di:waypoint x="3445" y="887" />
+        <di:waypoint x="3445" y="840" />
+        <di:waypoint x="2920" y="840" />
+        <di:waypoint x="2920" y="1140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Withdrawn_di" bpmnElement="Flow_Withdrawn">
+        <di:waypoint x="4330" y="1370" />
+        <di:waypoint x="4330" y="1425" />
+        <di:waypoint x="4370" y="1425" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Closed_di" bpmnElement="Flow_Closed">
+        <di:waypoint x="4470" y="1425" />
+        <di:waypoint x="4545" y="1425" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ByTeam_di" bpmnElement="Flow_ByTeam">
+        <di:waypoint x="4595" y="1425" />
+        <di:waypoint x="4702" y="1425" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4605" y="1408" width="28" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ByGuide_di" bpmnElement="Flow_ByGuide">
+        <di:waypoint x="4570" y="1400" />
+        <di:waypoint x="4570" y="1374" />
+        <di:waypoint x="2920" y="1374" />
+        <di:waypoint x="2920" y="1190" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4575" y="1380" width="34" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToFinish_di" bpmnElement="Flow_ToFinish">
+        <di:waypoint x="5045" y="1165" />
+        <di:waypoint x="5145" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToNotify_di" bpmnElement="Flow_ToNotify">
+        <di:waypoint x="5170" y="1140" />
+        <di:waypoint x="5170" y="1035" />
+        <di:waypoint x="5270" y="1035" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToRecord_di" bpmnElement="Flow_ToRecord">
+        <di:waypoint x="5170" y="1190" />
+        <di:waypoint x="5170" y="1295" />
+        <di:waypoint x="5270" y="1295" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Notified_di" bpmnElement="Flow_Notified">
+        <di:waypoint x="5370" y="1035" />
+        <di:waypoint x="5445" y="1035" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotifyFailed_di" bpmnElement="Flow_NotifyFailed">
+        <di:waypoint x="5320" y="977" />
+        <di:waypoint x="5320" y="945" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ManualNotified_di" bpmnElement="Flow_ManualNotified">
+        <di:waypoint x="5370" y="905" />
+        <di:waypoint x="5470" y="905" />
+        <di:waypoint x="5470" y="1010" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotifyDone_di" bpmnElement="Flow_NotifyDone">
+        <di:waypoint x="5495" y="1035" />
+        <di:waypoint x="5620" y="1035" />
+        <di:waypoint x="5620" y="1140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Recorded_di" bpmnElement="Flow_Recorded">
+        <di:waypoint x="5370" y="1295" />
+        <di:waypoint x="5620" y="1295" />
+        <di:waypoint x="5620" y="1190" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Finished_di" bpmnElement="Flow_Finished">
+        <di:waypoint x="5645" y="1165" />
+        <di:waypoint x="5752" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Request_di" bpmnElement="MsgFlow_Request">
+        <di:waypoint x="3820" y="1205" />
+        <di:waypoint x="3820" y="1540" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3824" y="1506" width="63" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Accept_di" bpmnElement="MsgFlow_Accept">
+        <di:waypoint x="4096" y="1540" />
+        <di:waypoint x="4096" y="1069" />
+        <di:waypoint x="4120" y="1069" />
+        <di:waypoint x="4120" y="1053" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4100" y="1520" width="63" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Decline_di" bpmnElement="MsgFlow_Decline">
+        <di:waypoint x="4120" y="1540" />
+        <di:waypoint x="4120" y="1313" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4124" y="1502" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Withdraw_di" bpmnElement="MsgFlow_Withdraw">
+        <di:waypoint x="4330" y="1540" />
+        <di:waypoint x="4330" y="1370" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4334" y="1520" width="63" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

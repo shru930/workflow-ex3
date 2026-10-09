@@ -1,0 +1,1902 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_shipment-exception-management" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.50.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.8.0">
+  <bpmn:collaboration id="Collaboration_shipment-exception-management">
+    <bpmn:participant id="Participant_Main" name="Courier Company" processRef="shipment-exception-management" />
+    <bpmn:participant id="Participant_Shipper" name="Shipper / Customer">
+      <bpmn:documentation>External party that books, pays, corrects data and may cancel.</bpmn:documentation>
+    </bpmn:participant>
+    <bpmn:participant id="Participant_Recipient" name="Recipient">
+      <bpmn:documentation>External party who receives (or refuses) the parcel.</bpmn:documentation>
+    </bpmn:participant>
+    <bpmn:messageFlow id="MsgFlow_Booking" name="Booking" sourceRef="Participant_Shipper" targetRef="Start_Booking" />
+    <bpmn:messageFlow id="MsgFlow_CorrReq" name="Errors" sourceRef="Task_RequestCorrection" targetRef="Participant_Shipper" />
+    <bpmn:messageFlow id="MsgFlow_Corr" name="Corrected booking" sourceRef="Participant_Shipper" targetRef="Task_AwaitCorrection" />
+    <bpmn:messageFlow id="MsgFlow_Tracking" name="Tracking link" sourceRef="Task_TrackingUpdate" targetRef="Participant_Shipper" />
+    <bpmn:messageFlow id="MsgFlow_Cancel" name="Cancel" sourceRef="Participant_Shipper" targetRef="Bnd_Cancel" />
+    <bpmn:messageFlow id="MsgFlow_DocsReq" name="Document request" sourceRef="Task_RequestDocs" targetRef="Participant_Shipper" />
+    <bpmn:messageFlow id="MsgFlow_Docs" name="Documents" sourceRef="Participant_Shipper" targetRef="Task_AwaitDocs" />
+    <bpmn:messageFlow id="MsgFlow_Window" name="Delivery window" sourceRef="Task_OutForDelivery" targetRef="Participant_Recipient" />
+    <bpmn:messageFlow id="MsgFlow_AddrReq" name="Address query" sourceRef="Task_ContactRecipient" targetRef="Participant_Recipient" />
+    <bpmn:messageFlow id="MsgFlow_Addr" name="Address" sourceRef="Participant_Recipient" targetRef="Task_AwaitAddress" />
+  </bpmn:collaboration>
+  <bpmn:process id="shipment-exception-management" name="Logistics and Shipment Exception Management" isExecutable="true">
+    <bpmn:documentation>Full shipment life cycle from booking to closure, with every exception detected and resolved inside the model: booking errors, failed pickup, scan failures, damage, loss, transit delays, customs holds, failed delivery attempts, refusals, address problems and cancellation after dispatch (E1–E10).</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_Main">
+      <bpmn:lane id="Lane_ControlTower" name="Control Tower / Dispatcher">
+        <bpmn:documentation>Booking, payment, dispatch planning, customer communication and shipment closure.</bpmn:documentation>
+        <bpmn:flowNodeRef>Start_Booking</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_BookingMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ValidateBooking</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_BookingValid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RequestCorrection</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AwaitCorrection</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_CorrectionTimeout</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_BookingLapsed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_TakePayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_PaymentComp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RefundCharges</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SchedulePickup</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_DispatchSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_TrackingUpdate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_BookLinehaul</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_DispatchJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RecallParcel</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Throw_RefundCancel</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RequestDocs</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AwaitDocs</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_DocsTimeout</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_DeliveredMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CloseShipment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Delivered</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Hub" name="Hub / Warehouse">
+        <bpmn:documentation>Sorting, line-haul between hubs, customs filing, depot holds and returns.</bpmn:documentation>
+        <bpmn:flowNodeRef>Gw_TransitMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Sub_Transit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_Cancel</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_Damaged</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_NoScan</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_International</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_CustomsMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_FileCustoms</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_CustomsCleared</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_CustomsDone</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_HoldDepot</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_DepotEvent</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Catch_Collected</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Catch_HoldExpired</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_ReturnMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReturnToSender</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Returned</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Pickup" name="Pickup Agent">
+        <bpmn:documentation>Collects the parcel from the shipper.</bpmn:documentation>
+        <bpmn:flowNodeRef>Gw_PickupMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CollectParcel</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_PickupOk</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_PickupRetry</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Catch_NextPickup</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Throw_RefundBooking</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_BookingCancelled</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Delivery" name="Delivery Agent">
+        <bpmn:documentation>Last-mile delivery to the recipient.</bpmn:documentation>
+        <bpmn:flowNodeRef>Task_OutForDelivery</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_AttemptMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AttemptDelivery</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_DeliveryOutcome</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_AttemptsLeft</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Catch_NextDay</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ContactRecipient</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AwaitAddress</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_AddressTimeout</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Claims" name="Claims Department">
+        <bpmn:documentation>Damage inspection, insurance claims and lost-parcel tracing.</bpmn:documentation>
+        <bpmn:flowNodeRef>Gw_DamageMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_InspectDamage</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Insured</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SettleClaim</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_ClaimSettled</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_InformUninsured</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_DamageClosed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_TraceParcel</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_TraceTimeout</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_DeclareLost</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Lost</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_Booking" name="Booking received">
+      <bpmn:documentation>Message start: the shipper books a shipment on the portal / API.</bpmn:documentation>
+      <bpmn:outgoing>Flow_B1</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Start_Booking_messageDef" messageRef="Msg_Booking" />
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="Gw_BookingMerge">
+      <bpmn:documentation>Merge: original and corrected bookings.</bpmn:documentation>
+      <bpmn:incoming>Flow_B1</bpmn:incoming>
+      <bpmn:incoming>Flow_Corrected</bpmn:incoming>
+      <bpmn:outgoing>Flow_B2</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:businessRuleTask id="Task_ValidateBooking" name="Validate booking and calculate charges">
+      <bpmn:documentation>Rules check address format and serviceability, declared weight and dimensions against the service level, prohibited items, and price the shipment.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="validate-and-price-booking" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_B2</bpmn:incoming>
+      <bpmn:outgoing>Flow_B3</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="Gw_BookingValid" name="Booking valid?" default="Flow_BookingBad">
+      <bpmn:documentation>E2 (at booking) — exclusive: valid, or invalid (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_B3</bpmn:incoming>
+      <bpmn:outgoing>Flow_BookingOk</bpmn:outgoing>
+      <bpmn:outgoing>Flow_BookingBad</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="Task_RequestCorrection" name="Request booking correction">
+      <bpmn:documentation>E2 — returns the validation errors (bad address, weight mismatch) to the shipper.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="request-booking-correction" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_BookingBad</bpmn:incoming>
+      <bpmn:outgoing>Flow_B4</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:receiveTask id="Task_AwaitCorrection" name="Await corrected booking" messageRef="Msg_CorrectedBooking">
+      <bpmn:documentation>Waits for the corrected booking.</bpmn:documentation>
+      <bpmn:incoming>Flow_B4</bpmn:incoming>
+      <bpmn:outgoing>Flow_Corrected</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:boundaryEvent id="Bnd_CorrectionTimeout" name="48 h without correction" cancelActivity="true" attachedToRef="Task_AwaitCorrection">
+      <bpmn:documentation>E2 — interrupting timer: the booking is dropped.</bpmn:documentation>
+      <bpmn:outgoing>Flow_B5</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_CorrectionTimeout_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT48H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_BookingLapsed" name="Booking lapsed">
+      <bpmn:documentation>Terminal: invalid booking never corrected.</bpmn:documentation>
+      <bpmn:incoming>Flow_B5</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_TakePayment" name="Confirm booking and take payment">
+      <bpmn:documentation>Charges the shipper (or posts to the account) and issues the tracking number.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="take-payment" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_BookingOk</bpmn:incoming>
+      <bpmn:outgoing>Flow_B6</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Bnd_PaymentComp" name="Undo charge" cancelActivity="true" attachedToRef="Task_TakePayment">
+      <bpmn:documentation>Compensation boundary for the payment.</bpmn:documentation>
+      <bpmn:compensateEventDefinition id="Bnd_PaymentComp_compensateDef" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="Task_RefundCharges" name="Refund charges minus fee" isForCompensation="true">
+      <bpmn:documentation>Compensation handler: refunds the shipping charge less the cancellation fee.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="refund-charges" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_SchedulePickup" name="Schedule pickup and assign driver">
+      <bpmn:documentation>Plans the pickup run and assigns the nearest available pickup agent.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="schedule-pickup" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_B6</bpmn:incoming>
+      <bpmn:outgoing>Flow_B7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_PickupMerge">
+      <bpmn:documentation>Merge: first attempt and rescheduled attempts.</bpmn:documentation>
+      <bpmn:incoming>Flow_B7</bpmn:incoming>
+      <bpmn:incoming>Flow_P3</bpmn:incoming>
+      <bpmn:outgoing>Flow_P1</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_CollectParcel" name="Collect and scan parcel">
+      <bpmn:documentation>Agent collects the parcel, checks packaging and scans it into the network, or records why pickup failed (shipper absent, parcel not ready).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/collect-and-scan-parcel" />
+        <zeebe:assignmentDefinition candidateGroups="pickup-agents" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_P1</bpmn:incoming>
+      <bpmn:outgoing>Flow_P5</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_PickupOk" name="Parcel collected?" default="Flow_PickupFailed">
+      <bpmn:documentation>E1 — exclusive: collected, or pickup failed (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_P5</bpmn:incoming>
+      <bpmn:outgoing>Flow_PickedUp</bpmn:outgoing>
+      <bpmn:outgoing>Flow_PickupFailed</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_PickupRetry" name="Reschedules left?" default="Flow_PickupNo">
+      <bpmn:documentation>E1 — bounded loop: at most 2 reschedules.</bpmn:documentation>
+      <bpmn:incoming>Flow_PickupFailed</bpmn:incoming>
+      <bpmn:outgoing>Flow_PickupYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_PickupNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="Catch_NextPickup" name="Next pickup slot">
+      <bpmn:documentation>E1 — waits for the rescheduled slot (next working day) and counts the attempt.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=if pickupReschedules = null then 1 else pickupReschedules + 1" target="pickupReschedules" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_PickupYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_P3</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Catch_NextPickup_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P1D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:intermediateThrowEvent id="Throw_RefundBooking" name="Refund minus fee">
+      <bpmn:documentation>E1 — compensation: triggers Refund charges minus fee for the payment taken at booking.</bpmn:documentation>
+      <bpmn:incoming>Flow_PickupNo</bpmn:incoming>
+      <bpmn:outgoing>Flow_P4</bpmn:outgoing>
+      <bpmn:compensateEventDefinition id="Throw_RefundBooking_compensateDef" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:endEvent id="End_BookingCancelled" name="Booking cancelled">
+      <bpmn:documentation>Terminal: parcel never collected; cancellation fee charged.</bpmn:documentation>
+      <bpmn:incoming>Flow_P4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:parallelGateway id="Gw_DispatchSplit">
+      <bpmn:documentation>Parallel split: customer update and line-haul booking are independent.</bpmn:documentation>
+      <bpmn:incoming>Flow_PickedUp</bpmn:incoming>
+      <bpmn:outgoing>Flow_D1</bpmn:outgoing>
+      <bpmn:outgoing>Flow_D2</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:sendTask id="Task_TrackingUpdate" name="Send tracking update to shipper">
+      <bpmn:documentation>Tells the shipper the parcel is collected, with the tracking link.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-tracking-update" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_D1</bpmn:incoming>
+      <bpmn:outgoing>Flow_D3</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:serviceTask id="Task_BookLinehaul" name="Plan route and book line-haul">
+      <bpmn:documentation>Computes the hub legs (remainingLegs) and books capacity on each line-haul.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="plan-route" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_D2</bpmn:incoming>
+      <bpmn:outgoing>Flow_D4</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:parallelGateway id="Gw_DispatchJoin">
+      <bpmn:documentation>Parallel join: both must finish before the parcel moves.</bpmn:documentation>
+      <bpmn:incoming>Flow_D3</bpmn:incoming>
+      <bpmn:incoming>Flow_D4</bpmn:incoming>
+      <bpmn:outgoing>Flow_D5</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:exclusiveGateway id="Gw_TransitMerge">
+      <bpmn:documentation>Merge: normal dispatch and resumption after a successful trace.</bpmn:documentation>
+      <bpmn:incoming>Flow_D5</bpmn:incoming>
+      <bpmn:incoming>Flow_Found</bpmn:incoming>
+      <bpmn:outgoing>Flow_T0</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:subProcess id="Sub_Transit" name="Hub sorting and line-haul (per leg)">
+      <bpmn:documentation>Multi-instance (sequential) embedded sub-process: one instance per remaining hub leg.</bpmn:documentation>
+      <bpmn:incoming>Flow_T0</bpmn:incoming>
+      <bpmn:outgoing>Flow_T20</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics isSequential="true">
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=remainingLegs" inputElement="leg" />
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+      <bpmn:startEvent id="Start_Leg" name="Leg started">
+        <bpmn:documentation>Blank start of one leg.</bpmn:documentation>
+        <bpmn:outgoing>Flow_T1</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:serviceTask id="Task_SortScan" name="Sort and scan at hub">
+        <bpmn:documentation>Automated sorter scans the parcel (barcode + damage camera) and routes it. Throws SCAN_FAILED when the scanner is offline or the data does not match.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="sort-and-scan" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_T1</bpmn:incoming>
+        <bpmn:outgoing>Flow_T2</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:boundaryEvent id="Bnd_ScanFailed" name="Scan failed" cancelActivity="true" attachedToRef="Task_SortScan">
+        <bpmn:documentation>E9 — scanner offline or system mismatch.</bpmn:documentation>
+        <bpmn:outgoing>Flow_T3</bpmn:outgoing>
+        <bpmn:errorEventDefinition id="Bnd_ScanFailed_errorDef" errorRef="Err_ScanFailed" />
+      </bpmn:boundaryEvent>
+      <bpmn:userTask id="Task_ManualScan" name="Record scan manually">
+        <bpmn:documentation>E9 — hub supervisor records the scan by hand.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:userTask />
+          <zeebe:formDefinition externalReference="/forms/record-scan-manually" />
+          <zeebe:assignmentDefinition candidateGroups="hub-supervisors" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_T3</bpmn:incoming>
+        <bpmn:outgoing>Flow_T4</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:serviceTask id="Task_Reconcile" name="Reconcile scan records">
+        <bpmn:documentation>E9 — reconciles the manual record with tracking once systems are back.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="reconcile-scans" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_T4</bpmn:incoming>
+        <bpmn:outgoing>Flow_T5</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:exclusiveGateway id="Gw_ScanMerge">
+        <bpmn:documentation>Merge: normal or manual scan.</bpmn:documentation>
+        <bpmn:incoming>Flow_T2</bpmn:incoming>
+        <bpmn:incoming>Flow_T5</bpmn:incoming>
+        <bpmn:outgoing>Flow_T6</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:exclusiveGateway id="Gw_Intact" name="Parcel intact?" default="Flow_IntactNo">
+        <bpmn:documentation>E3 — exclusive: intact, or damaged (default).</bpmn:documentation>
+        <bpmn:incoming>Flow_T6</bpmn:incoming>
+        <bpmn:outgoing>Flow_IntactYes</bpmn:outgoing>
+        <bpmn:outgoing>Flow_IntactNo</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:endEvent id="End_DamageFound" name="Damage found">
+        <bpmn:documentation>E3 — error end: throws PARCEL_DAMAGED to the sub-process boundary.</bpmn:documentation>
+        <bpmn:incoming>Flow_IntactNo</bpmn:incoming>
+        <bpmn:errorEventDefinition id="End_DamageFound_errorDef" errorRef="Err_Damaged" />
+      </bpmn:endEvent>
+      <bpmn:serviceTask id="Task_Dispatch" name="Load and dispatch to next hub">
+        <bpmn:documentation>Loads the parcel on the booked line-haul and records departure.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="dispatch-linehaul" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_IntactYes</bpmn:incoming>
+        <bpmn:outgoing>Flow_T7</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:exclusiveGateway id="Gw_WaitMerge">
+        <bpmn:documentation>Merge: back to waiting after a delay is handled.</bpmn:documentation>
+        <bpmn:incoming>Flow_T7</bpmn:incoming>
+        <bpmn:incoming>Flow_T19</bpmn:incoming>
+        <bpmn:outgoing>Flow_T8</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:eventBasedGateway id="Gw_TransitEvent" name="Next transit event?">
+        <bpmn:documentation>Event-based gateway: arrival scan, a reported delay, or the ETA running out — whichever comes first.</bpmn:documentation>
+        <bpmn:incoming>Flow_T8</bpmn:incoming>
+        <bpmn:outgoing>Flow_T9</bpmn:outgoing>
+        <bpmn:outgoing>Flow_T10</bpmn:outgoing>
+        <bpmn:outgoing>Flow_T11</bpmn:outgoing>
+      </bpmn:eventBasedGateway>
+      <bpmn:intermediateCatchEvent id="Catch_Arrived" name="Arrival scan">
+        <bpmn:documentation>Parcel scanned in at the next hub.</bpmn:documentation>
+        <bpmn:incoming>Flow_T9</bpmn:incoming>
+        <bpmn:outgoing>Flow_T12</bpmn:outgoing>
+        <bpmn:messageEventDefinition id="Catch_Arrived_messageDef" messageRef="Msg_Arrived" />
+      </bpmn:intermediateCatchEvent>
+      <bpmn:endEvent id="End_LegDone" name="Leg completed">
+        <bpmn:documentation>One leg done.</bpmn:documentation>
+        <bpmn:incoming>Flow_T12</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:intermediateCatchEvent id="Catch_DelayReported" name="Delay reported">
+        <bpmn:documentation>E5 — weather, strike, breakdown or hub overload reported by the driver or hub.</bpmn:documentation>
+        <bpmn:incoming>Flow_T10</bpmn:incoming>
+        <bpmn:outgoing>Flow_T13</bpmn:outgoing>
+        <bpmn:messageEventDefinition id="Catch_DelayReported_messageDef" messageRef="Msg_Delay" />
+      </bpmn:intermediateCatchEvent>
+      <bpmn:intermediateCatchEvent id="Catch_EtaExceeded" name="ETA exceeded">
+        <bpmn:documentation>E5 — nothing heard and the leg ETA has passed.</bpmn:documentation>
+        <bpmn:incoming>Flow_T11</bpmn:incoming>
+        <bpmn:outgoing>Flow_T14</bpmn:outgoing>
+        <bpmn:timerEventDefinition id="Catch_EtaExceeded_timerDef">
+          <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT12H</bpmn:timeDuration>
+        </bpmn:timerEventDefinition>
+      </bpmn:intermediateCatchEvent>
+      <bpmn:exclusiveGateway id="Gw_DelayMerge">
+        <bpmn:documentation>Merge: both delay triggers handled the same way.</bpmn:documentation>
+        <bpmn:incoming>Flow_T13</bpmn:incoming>
+        <bpmn:incoming>Flow_T14</bpmn:incoming>
+        <bpmn:outgoing>Flow_T15</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:inclusiveGateway id="Gw_DelaySplit" name="Delay response?">
+        <bpmn:documentation>E5 — inclusive split: the customer is always told; reroute and / or a replacement vehicle are added only when needed.</bpmn:documentation>
+        <bpmn:incoming>Flow_T15</bpmn:incoming>
+        <bpmn:outgoing>Flow_DelayNotify</bpmn:outgoing>
+        <bpmn:outgoing>Flow_DelayReroute</bpmn:outgoing>
+        <bpmn:outgoing>Flow_DelayVehicle</bpmn:outgoing>
+      </bpmn:inclusiveGateway>
+      <bpmn:sendTask id="Task_NotifyEta" name="Notify shipper of new ETA">
+        <bpmn:documentation>E5 — always done.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="notify-new-eta" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_DelayNotify</bpmn:incoming>
+        <bpmn:outgoing>Flow_T16</bpmn:outgoing>
+      </bpmn:sendTask>
+      <bpmn:serviceTask id="Task_Reroute" name="Reroute shipment">
+        <bpmn:documentation>E5 — when the route is blocked.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="reroute-shipment" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_DelayReroute</bpmn:incoming>
+        <bpmn:outgoing>Flow_T17</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:userTask id="Task_AltVehicle" name="Assign alternate vehicle">
+        <bpmn:documentation>E5 — when the vehicle broke down.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:userTask />
+          <zeebe:formDefinition externalReference="/forms/assign-alternate-vehicle" />
+          <zeebe:assignmentDefinition candidateGroups="hub-staff" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_DelayVehicle</bpmn:incoming>
+        <bpmn:outgoing>Flow_T18</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:inclusiveGateway id="Gw_DelayJoin">
+        <bpmn:documentation>Inclusive join: waits only for the branches that were started.</bpmn:documentation>
+        <bpmn:incoming>Flow_T16</bpmn:incoming>
+        <bpmn:incoming>Flow_T17</bpmn:incoming>
+        <bpmn:incoming>Flow_T18</bpmn:incoming>
+        <bpmn:outgoing>Flow_T19</bpmn:outgoing>
+      </bpmn:inclusiveGateway>
+      <bpmn:sequenceFlow id="Flow_T1" sourceRef="Start_Leg" targetRef="Task_SortScan" />
+      <bpmn:sequenceFlow id="Flow_T2" sourceRef="Task_SortScan" targetRef="Gw_ScanMerge" />
+      <bpmn:sequenceFlow id="Flow_T3" sourceRef="Bnd_ScanFailed" targetRef="Task_ManualScan" />
+      <bpmn:sequenceFlow id="Flow_T4" sourceRef="Task_ManualScan" targetRef="Task_Reconcile" />
+      <bpmn:sequenceFlow id="Flow_T5" sourceRef="Task_Reconcile" targetRef="Gw_ScanMerge" />
+      <bpmn:sequenceFlow id="Flow_T6" sourceRef="Gw_ScanMerge" targetRef="Gw_Intact" />
+      <bpmn:sequenceFlow id="Flow_IntactYes" name="Yes" sourceRef="Gw_Intact" targetRef="Task_Dispatch">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=damaged != true</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_IntactNo" name="No" sourceRef="Gw_Intact" targetRef="End_DamageFound" />
+      <bpmn:sequenceFlow id="Flow_T7" sourceRef="Task_Dispatch" targetRef="Gw_WaitMerge" />
+      <bpmn:sequenceFlow id="Flow_T8" sourceRef="Gw_WaitMerge" targetRef="Gw_TransitEvent" />
+      <bpmn:sequenceFlow id="Flow_T9" sourceRef="Gw_TransitEvent" targetRef="Catch_Arrived" />
+      <bpmn:sequenceFlow id="Flow_T10" sourceRef="Gw_TransitEvent" targetRef="Catch_DelayReported" />
+      <bpmn:sequenceFlow id="Flow_T11" sourceRef="Gw_TransitEvent" targetRef="Catch_EtaExceeded" />
+      <bpmn:sequenceFlow id="Flow_T12" sourceRef="Catch_Arrived" targetRef="End_LegDone" />
+      <bpmn:sequenceFlow id="Flow_T13" sourceRef="Catch_DelayReported" targetRef="Gw_DelayMerge" />
+      <bpmn:sequenceFlow id="Flow_T14" sourceRef="Catch_EtaExceeded" targetRef="Gw_DelayMerge" />
+      <bpmn:sequenceFlow id="Flow_T15" sourceRef="Gw_DelayMerge" targetRef="Gw_DelaySplit" />
+      <bpmn:sequenceFlow id="Flow_DelayNotify" name="Always" sourceRef="Gw_DelaySplit" targetRef="Task_NotifyEta">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=true</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_DelayReroute" name="Route blocked" sourceRef="Gw_DelaySplit" targetRef="Task_Reroute">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=routeBlocked = true</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_DelayVehicle" name="Vehicle down" sourceRef="Gw_DelaySplit" targetRef="Task_AltVehicle">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=vehicleDown = true</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_T16" sourceRef="Task_NotifyEta" targetRef="Gw_DelayJoin" />
+      <bpmn:sequenceFlow id="Flow_T17" sourceRef="Task_Reroute" targetRef="Gw_DelayJoin" />
+      <bpmn:sequenceFlow id="Flow_T18" sourceRef="Task_AltVehicle" targetRef="Gw_DelayJoin" />
+      <bpmn:sequenceFlow id="Flow_T19" sourceRef="Gw_DelayJoin" targetRef="Gw_WaitMerge" />
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="Bnd_Cancel" name="Cancellation received" cancelActivity="true" attachedToRef="Sub_Transit">
+      <bpmn:documentation>E10 — interrupting message: the shipper cancels while the parcel is in transit.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Cancel</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Bnd_Cancel_messageDef" messageRef="Msg_Cancel" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Bnd_Damaged" name="Parcel damaged" cancelActivity="true" attachedToRef="Sub_Transit">
+      <bpmn:documentation>E3 — damage found at a hub.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Damaged</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Bnd_Damaged_errorDef" errorRef="Err_Damaged" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Bnd_NoScan" name="No scan for 48 h" cancelActivity="true" attachedToRef="Sub_Transit">
+      <bpmn:documentation>E4 — interrupting timer: parcel has gone silent.</bpmn:documentation>
+      <bpmn:outgoing>Flow_NoScan</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_NoScan_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT48H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:userTask id="Task_RecallParcel" name="Stop movement and recall parcel">
+      <bpmn:documentation>E10 — dispatcher stops the parcel at the nearest hub and books it back to origin.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/stop-movement-and-recall-parcel" />
+        <zeebe:assignmentDefinition candidateGroups="dispatchers" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Cancel</bpmn:incoming>
+      <bpmn:outgoing>Flow_C2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:intermediateThrowEvent id="Throw_RefundCancel" name="Refund minus fee">
+      <bpmn:documentation>E10 — compensation: refunds the charge less the cancellation fee.</bpmn:documentation>
+      <bpmn:incoming>Flow_C2</bpmn:incoming>
+      <bpmn:outgoing>Flow_C3</bpmn:outgoing>
+      <bpmn:compensateEventDefinition id="Throw_RefundCancel_compensateDef" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:exclusiveGateway id="Gw_International" name="International?" default="Flow_IntlNo">
+      <bpmn:documentation>E6 — exclusive: only international shipments need customs.</bpmn:documentation>
+      <bpmn:incoming>Flow_T20</bpmn:incoming>
+      <bpmn:outgoing>Flow_IntlYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_IntlNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_CustomsMerge">
+      <bpmn:documentation>Merge: first filing and re-filing with new documents.</bpmn:documentation>
+      <bpmn:incoming>Flow_IntlYes</bpmn:incoming>
+      <bpmn:incoming>Flow_X4</bpmn:incoming>
+      <bpmn:outgoing>Flow_X1</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_FileCustoms" name="File customs declaration">
+      <bpmn:documentation>Submits the export / import declaration.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="file-customs" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_X1</bpmn:incoming>
+      <bpmn:outgoing>Flow_X2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_CustomsCleared" name="Customs cleared?" default="Flow_ClearedNo">
+      <bpmn:documentation>E6 — exclusive: cleared, or held for documents (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_X2</bpmn:incoming>
+      <bpmn:outgoing>Flow_ClearedYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ClearedNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="Task_RequestDocs" name="Request documents from shipper">
+      <bpmn:documentation>E6 — asks for the missing invoice, permit or HS-code details.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="request-customs-documents" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ClearedNo</bpmn:incoming>
+      <bpmn:outgoing>Flow_X3</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:receiveTask id="Task_AwaitDocs" name="Await customs documents" messageRef="Msg_CustomsDocs">
+      <bpmn:documentation>E6 — waits for the shipper.</bpmn:documentation>
+      <bpmn:incoming>Flow_X3</bpmn:incoming>
+      <bpmn:outgoing>Flow_X4</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:boundaryEvent id="Bnd_DocsTimeout" name="5 days, no documents" cancelActivity="true" attachedToRef="Task_AwaitDocs">
+      <bpmn:documentation>E6 — interrupting timer: parcel goes back to origin.</bpmn:documentation>
+      <bpmn:outgoing>Flow_X5</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_DocsTimeout_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P5D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:exclusiveGateway id="Gw_CustomsDone">
+      <bpmn:documentation>Merge: domestic, or international and cleared.</bpmn:documentation>
+      <bpmn:incoming>Flow_IntlNo</bpmn:incoming>
+      <bpmn:incoming>Flow_ClearedYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_X6</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="Task_OutForDelivery" name="Send out for delivery and notify recipient">
+      <bpmn:documentation>Assigns the parcel to a delivery run and sends the recipient the delivery window.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="notify-recipient" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_X6</bpmn:incoming>
+      <bpmn:outgoing>Flow_V1</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:exclusiveGateway id="Gw_AttemptMerge">
+      <bpmn:documentation>Merge: first attempt, re-attempts, corrected address.</bpmn:documentation>
+      <bpmn:incoming>Flow_V1</bpmn:incoming>
+      <bpmn:incoming>Flow_V4</bpmn:incoming>
+      <bpmn:incoming>Flow_AddrOk</bpmn:incoming>
+      <bpmn:outgoing>Flow_V2</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_AttemptDelivery" name="Attempt delivery and capture POD">
+      <bpmn:documentation>Agent hands over the parcel, collects COD if due, and captures signature / photo as proof of delivery.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/attempt-delivery-and-capture-pod" />
+        <zeebe:assignmentDefinition candidateGroups="delivery-agents" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_V2</bpmn:incoming>
+      <bpmn:outgoing>Flow_V3</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_DeliveryOutcome" name="Delivery outcome?" default="Flow_NotHome">
+      <bpmn:documentation>Exclusive five-way outcome. "Not at home" is the default because it is the safe, retryable case.</bpmn:documentation>
+      <bpmn:incoming>Flow_V3</bpmn:incoming>
+      <bpmn:outgoing>Flow_Delivered</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NotHome</bpmn:outgoing>
+      <bpmn:outgoing>Flow_WrongAddr</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Refused</bpmn:outgoing>
+      <bpmn:outgoing>Flow_DamagedAtDoor</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_AttemptsLeft" name="Fewer than 3 attempts?" default="Flow_AttemptNo">
+      <bpmn:documentation>E7 — bounded loop: 3 delivery attempts.</bpmn:documentation>
+      <bpmn:incoming>Flow_NotHome</bpmn:incoming>
+      <bpmn:outgoing>Flow_AttemptYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_AttemptNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="Catch_NextDay" name="Next delivery day">
+      <bpmn:documentation>E7 — waits for the next run and counts the attempt.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=if deliveryAttempts = null then 1 else deliveryAttempts + 1" target="deliveryAttempts" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_AttemptYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_V4</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Catch_NextDay_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P1D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:sendTask id="Task_ContactRecipient" name="Ask recipient for correct address">
+      <bpmn:documentation>E2 (at doorstep) — contacts the recipient; an address change outside the zone carries a surcharge billed at closure.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="contact-recipient" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_WrongAddr</bpmn:incoming>
+      <bpmn:outgoing>Flow_V5</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:receiveTask id="Task_AwaitAddress" name="Await address details" messageRef="Msg_Address">
+      <bpmn:documentation>E2 — waits for the recipient.</bpmn:documentation>
+      <bpmn:incoming>Flow_V5</bpmn:incoming>
+      <bpmn:outgoing>Flow_AddrOk</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:boundaryEvent id="Bnd_AddressTimeout" name="No reply in 2 days" cancelActivity="true" attachedToRef="Task_AwaitAddress">
+      <bpmn:documentation>E2 — interrupting timer: return to sender.</bpmn:documentation>
+      <bpmn:outgoing>Flow_V6</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_AddressTimeout_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P2D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="Task_HoldDepot" name="Hold at depot and notify recipient">
+      <bpmn:documentation>E7 — parcel is held at the depot for self-collection.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="hold-at-depot" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_AttemptNo</bpmn:incoming>
+      <bpmn:outgoing>Flow_V7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:eventBasedGateway id="Gw_DepotEvent" name="Collected?">
+      <bpmn:documentation>Event-based gateway: collection or 7 days, whichever first.</bpmn:documentation>
+      <bpmn:incoming>Flow_V7</bpmn:incoming>
+      <bpmn:outgoing>Flow_V8</bpmn:outgoing>
+      <bpmn:outgoing>Flow_V9</bpmn:outgoing>
+    </bpmn:eventBasedGateway>
+    <bpmn:intermediateCatchEvent id="Catch_Collected" name="Recipient collects">
+      <bpmn:documentation>E7 — recipient collects from the depot.</bpmn:documentation>
+      <bpmn:incoming>Flow_V8</bpmn:incoming>
+      <bpmn:outgoing>Flow_V10</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Catch_Collected_messageDef" messageRef="Msg_Collected" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:intermediateCatchEvent id="Catch_HoldExpired" name="7 days uncollected">
+      <bpmn:documentation>E7 — hold period over.</bpmn:documentation>
+      <bpmn:incoming>Flow_V9</bpmn:incoming>
+      <bpmn:outgoing>Flow_V11</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Catch_HoldExpired_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:exclusiveGateway id="Gw_DeliveredMerge">
+      <bpmn:documentation>Merge: delivered at the door or collected at the depot.</bpmn:documentation>
+      <bpmn:incoming>Flow_Delivered</bpmn:incoming>
+      <bpmn:incoming>Flow_V10</bpmn:incoming>
+      <bpmn:outgoing>Flow_E1</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_CloseShipment" name="Close shipment and generate invoice">
+      <bpmn:documentation>Closes tracking, applies any surcharges, issues the invoice / receipt.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="close-shipment" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_E1</bpmn:incoming>
+      <bpmn:outgoing>Flow_E2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End_Delivered" name="Shipment delivered">
+      <bpmn:documentation>Successful end.</bpmn:documentation>
+      <bpmn:incoming>Flow_E2</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gw_ReturnMerge">
+      <bpmn:documentation>Merge: every route that ends in return to sender.</bpmn:documentation>
+      <bpmn:incoming>Flow_C3</bpmn:incoming>
+      <bpmn:incoming>Flow_X5</bpmn:incoming>
+      <bpmn:incoming>Flow_Refused</bpmn:incoming>
+      <bpmn:incoming>Flow_V6</bpmn:incoming>
+      <bpmn:incoming>Flow_V11</bpmn:incoming>
+      <bpmn:outgoing>Flow_R1</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_ReturnToSender" name="Return parcel to sender">
+      <bpmn:documentation>Books the return movement, adjusts charges (return fee, COD reversal) and informs the shipper.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="return-to-sender" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_R1</bpmn:incoming>
+      <bpmn:outgoing>Flow_R2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End_Returned" name="Returned to sender">
+      <bpmn:documentation>Terminal: parcel returned.</bpmn:documentation>
+      <bpmn:incoming>Flow_R2</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gw_DamageMerge">
+      <bpmn:documentation>Merge: damage found at a hub or at the door.</bpmn:documentation>
+      <bpmn:incoming>Flow_Damaged</bpmn:incoming>
+      <bpmn:incoming>Flow_DamagedAtDoor</bpmn:incoming>
+      <bpmn:outgoing>Flow_K1</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_InspectDamage" name="Inspect damage">
+      <bpmn:documentation>E3 — claims officer inspects photos / parcel and records the damage.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/inspect-damage" />
+        <zeebe:assignmentDefinition candidateGroups="claims" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_K1</bpmn:incoming>
+      <bpmn:outgoing>Flow_K2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_Insured" name="Insured?" default="Flow_InsuredNo">
+      <bpmn:documentation>E3 — exclusive: insured, or not (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_K2</bpmn:incoming>
+      <bpmn:outgoing>Flow_InsuredYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_InsuredNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_SettleClaim" name="Settle claim (refund, replace or reship)">
+      <bpmn:documentation>E3 — claim settled under the policy.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/settle-claim-refund-replace-or-reship" />
+        <zeebe:assignmentDefinition candidateGroups="claims" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_InsuredYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_K3</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="End_ClaimSettled" name="Claim settled">
+      <bpmn:documentation>Terminal: damaged shipment closed with settlement.</bpmn:documentation>
+      <bpmn:incoming>Flow_K3</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sendTask id="Task_InformUninsured" name="Record damage and inform shipper">
+      <bpmn:documentation>E3 — no cover; shipper informed.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="inform-damage" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_InsuredNo</bpmn:incoming>
+      <bpmn:outgoing>Flow_K4</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="End_DamageClosed" name="Closed as damaged">
+      <bpmn:documentation>Terminal: damaged, uninsured.</bpmn:documentation>
+      <bpmn:incoming>Flow_K4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="Task_TraceParcel" name="Trace parcel">
+      <bpmn:documentation>E4 — tracing: last-scan hub search, CCTV, driver interview. Completing the task means the parcel was found.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/trace-parcel" />
+        <zeebe:assignmentDefinition candidateGroups="claims" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_NoScan</bpmn:incoming>
+      <bpmn:outgoing>Flow_Found</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:boundaryEvent id="Bnd_TraceTimeout" name="Not found in 5 days" cancelActivity="true" attachedToRef="Task_TraceParcel">
+      <bpmn:documentation>E4 — interrupting timer: declared lost.</bpmn:documentation>
+      <bpmn:outgoing>Flow_L1</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_TraceTimeout_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P5D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="Task_DeclareLost" name="Declare lost and pay compensation">
+      <bpmn:documentation>E4 — compensation paid and shipper notified.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="declare-lost" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_L1</bpmn:incoming>
+      <bpmn:outgoing>Flow_L2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End_Lost" name="Closed as lost">
+      <bpmn:documentation>Terminal: parcel lost.</bpmn:documentation>
+      <bpmn:incoming>Flow_L2</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_B1" sourceRef="Start_Booking" targetRef="Gw_BookingMerge" />
+    <bpmn:sequenceFlow id="Flow_B2" sourceRef="Gw_BookingMerge" targetRef="Task_ValidateBooking" />
+    <bpmn:sequenceFlow id="Flow_B3" sourceRef="Task_ValidateBooking" targetRef="Gw_BookingValid" />
+    <bpmn:sequenceFlow id="Flow_BookingOk" name="Valid" sourceRef="Gw_BookingValid" targetRef="Task_TakePayment">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=bookingValid = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_BookingBad" name="Invalid" sourceRef="Gw_BookingValid" targetRef="Task_RequestCorrection" />
+    <bpmn:sequenceFlow id="Flow_B4" sourceRef="Task_RequestCorrection" targetRef="Task_AwaitCorrection" />
+    <bpmn:sequenceFlow id="Flow_Corrected" sourceRef="Task_AwaitCorrection" targetRef="Gw_BookingMerge" />
+    <bpmn:sequenceFlow id="Flow_B5" sourceRef="Bnd_CorrectionTimeout" targetRef="End_BookingLapsed" />
+    <bpmn:sequenceFlow id="Flow_B6" sourceRef="Task_TakePayment" targetRef="Task_SchedulePickup" />
+    <bpmn:sequenceFlow id="Flow_B7" sourceRef="Task_SchedulePickup" targetRef="Gw_PickupMerge" />
+    <bpmn:sequenceFlow id="Flow_P1" sourceRef="Gw_PickupMerge" targetRef="Task_CollectParcel" />
+    <bpmn:sequenceFlow id="Flow_PickupYes" name="Yes" sourceRef="Gw_PickupRetry" targetRef="Catch_NextPickup">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=pickupReschedules = null or pickupReschedules &lt; 2</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_PickupNo" name="No" sourceRef="Gw_PickupRetry" targetRef="Throw_RefundBooking" />
+    <bpmn:sequenceFlow id="Flow_P3" sourceRef="Catch_NextPickup" targetRef="Gw_PickupMerge" />
+    <bpmn:sequenceFlow id="Flow_P4" sourceRef="Throw_RefundBooking" targetRef="End_BookingCancelled" />
+    <bpmn:sequenceFlow id="Flow_P5" sourceRef="Task_CollectParcel" targetRef="Gw_PickupOk" />
+    <bpmn:sequenceFlow id="Flow_PickedUp" name="Yes" sourceRef="Gw_PickupOk" targetRef="Gw_DispatchSplit">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=pickedUp = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_PickupFailed" name="No" sourceRef="Gw_PickupOk" targetRef="Gw_PickupRetry" />
+    <bpmn:sequenceFlow id="Flow_D1" sourceRef="Gw_DispatchSplit" targetRef="Task_TrackingUpdate" />
+    <bpmn:sequenceFlow id="Flow_D2" sourceRef="Gw_DispatchSplit" targetRef="Task_BookLinehaul" />
+    <bpmn:sequenceFlow id="Flow_D3" sourceRef="Task_TrackingUpdate" targetRef="Gw_DispatchJoin" />
+    <bpmn:sequenceFlow id="Flow_D4" sourceRef="Task_BookLinehaul" targetRef="Gw_DispatchJoin" />
+    <bpmn:sequenceFlow id="Flow_D5" sourceRef="Gw_DispatchJoin" targetRef="Gw_TransitMerge" />
+    <bpmn:sequenceFlow id="Flow_T0" sourceRef="Gw_TransitMerge" targetRef="Sub_Transit" />
+    <bpmn:sequenceFlow id="Flow_T20" sourceRef="Sub_Transit" targetRef="Gw_International" />
+    <bpmn:sequenceFlow id="Flow_Cancel" sourceRef="Bnd_Cancel" targetRef="Task_RecallParcel" />
+    <bpmn:sequenceFlow id="Flow_C2" sourceRef="Task_RecallParcel" targetRef="Throw_RefundCancel" />
+    <bpmn:sequenceFlow id="Flow_C3" sourceRef="Throw_RefundCancel" targetRef="Gw_ReturnMerge" />
+    <bpmn:sequenceFlow id="Flow_Damaged" sourceRef="Bnd_Damaged" targetRef="Gw_DamageMerge" />
+    <bpmn:sequenceFlow id="Flow_NoScan" sourceRef="Bnd_NoScan" targetRef="Task_TraceParcel" />
+    <bpmn:sequenceFlow id="Flow_Found" sourceRef="Task_TraceParcel" targetRef="Gw_TransitMerge" />
+    <bpmn:sequenceFlow id="Flow_L1" sourceRef="Bnd_TraceTimeout" targetRef="Task_DeclareLost" />
+    <bpmn:sequenceFlow id="Flow_L2" sourceRef="Task_DeclareLost" targetRef="End_Lost" />
+    <bpmn:sequenceFlow id="Flow_K1" sourceRef="Gw_DamageMerge" targetRef="Task_InspectDamage" />
+    <bpmn:sequenceFlow id="Flow_K2" sourceRef="Task_InspectDamage" targetRef="Gw_Insured" />
+    <bpmn:sequenceFlow id="Flow_InsuredYes" name="Yes" sourceRef="Gw_Insured" targetRef="Task_SettleClaim">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=insured = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_InsuredNo" name="No" sourceRef="Gw_Insured" targetRef="Task_InformUninsured" />
+    <bpmn:sequenceFlow id="Flow_K3" sourceRef="Task_SettleClaim" targetRef="End_ClaimSettled" />
+    <bpmn:sequenceFlow id="Flow_K4" sourceRef="Task_InformUninsured" targetRef="End_DamageClosed" />
+    <bpmn:sequenceFlow id="Flow_IntlYes" name="Yes" sourceRef="Gw_International" targetRef="Gw_CustomsMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=international = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_IntlNo" name="No" sourceRef="Gw_International" targetRef="Gw_CustomsDone" />
+    <bpmn:sequenceFlow id="Flow_X1" sourceRef="Gw_CustomsMerge" targetRef="Task_FileCustoms" />
+    <bpmn:sequenceFlow id="Flow_X2" sourceRef="Task_FileCustoms" targetRef="Gw_CustomsCleared" />
+    <bpmn:sequenceFlow id="Flow_ClearedYes" name="Yes" sourceRef="Gw_CustomsCleared" targetRef="Gw_CustomsDone">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=customsCleared = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ClearedNo" name="Held" sourceRef="Gw_CustomsCleared" targetRef="Task_RequestDocs" />
+    <bpmn:sequenceFlow id="Flow_X3" sourceRef="Task_RequestDocs" targetRef="Task_AwaitDocs" />
+    <bpmn:sequenceFlow id="Flow_X4" sourceRef="Task_AwaitDocs" targetRef="Gw_CustomsMerge" />
+    <bpmn:sequenceFlow id="Flow_X5" sourceRef="Bnd_DocsTimeout" targetRef="Gw_ReturnMerge" />
+    <bpmn:sequenceFlow id="Flow_X6" sourceRef="Gw_CustomsDone" targetRef="Task_OutForDelivery" />
+    <bpmn:sequenceFlow id="Flow_V1" sourceRef="Task_OutForDelivery" targetRef="Gw_AttemptMerge" />
+    <bpmn:sequenceFlow id="Flow_V2" sourceRef="Gw_AttemptMerge" targetRef="Task_AttemptDelivery" />
+    <bpmn:sequenceFlow id="Flow_V3" sourceRef="Task_AttemptDelivery" targetRef="Gw_DeliveryOutcome" />
+    <bpmn:sequenceFlow id="Flow_Delivered" name="Delivered" sourceRef="Gw_DeliveryOutcome" targetRef="Gw_DeliveredMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=outcome = "DELIVERED"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NotHome" name="Not at home" sourceRef="Gw_DeliveryOutcome" targetRef="Gw_AttemptsLeft" />
+    <bpmn:sequenceFlow id="Flow_WrongAddr" name="Wrong address" sourceRef="Gw_DeliveryOutcome" targetRef="Task_ContactRecipient">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=outcome = "BAD_ADDRESS"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Refused" name="Refused / COD failed" sourceRef="Gw_DeliveryOutcome" targetRef="Gw_ReturnMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=outcome = "REFUSED" or outcome = "COD_FAILED"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_DamagedAtDoor" name="Damaged" sourceRef="Gw_DeliveryOutcome" targetRef="Gw_DamageMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=outcome = "DAMAGED"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AttemptYes" name="Yes" sourceRef="Gw_AttemptsLeft" targetRef="Catch_NextDay">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=deliveryAttempts = null or deliveryAttempts &lt; 2</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AttemptNo" name="No" sourceRef="Gw_AttemptsLeft" targetRef="Task_HoldDepot" />
+    <bpmn:sequenceFlow id="Flow_V4" sourceRef="Catch_NextDay" targetRef="Gw_AttemptMerge" />
+    <bpmn:sequenceFlow id="Flow_V5" sourceRef="Task_ContactRecipient" targetRef="Task_AwaitAddress" />
+    <bpmn:sequenceFlow id="Flow_AddrOk" sourceRef="Task_AwaitAddress" targetRef="Gw_AttemptMerge" />
+    <bpmn:sequenceFlow id="Flow_V6" sourceRef="Bnd_AddressTimeout" targetRef="Gw_ReturnMerge" />
+    <bpmn:sequenceFlow id="Flow_V7" sourceRef="Task_HoldDepot" targetRef="Gw_DepotEvent" />
+    <bpmn:sequenceFlow id="Flow_V8" sourceRef="Gw_DepotEvent" targetRef="Catch_Collected" />
+    <bpmn:sequenceFlow id="Flow_V9" sourceRef="Gw_DepotEvent" targetRef="Catch_HoldExpired" />
+    <bpmn:sequenceFlow id="Flow_V10" sourceRef="Catch_Collected" targetRef="Gw_DeliveredMerge" />
+    <bpmn:sequenceFlow id="Flow_V11" sourceRef="Catch_HoldExpired" targetRef="Gw_ReturnMerge" />
+    <bpmn:sequenceFlow id="Flow_E1" sourceRef="Gw_DeliveredMerge" targetRef="Task_CloseShipment" />
+    <bpmn:sequenceFlow id="Flow_E2" sourceRef="Task_CloseShipment" targetRef="End_Delivered" />
+    <bpmn:sequenceFlow id="Flow_R1" sourceRef="Gw_ReturnMerge" targetRef="Task_ReturnToSender" />
+    <bpmn:sequenceFlow id="Flow_R2" sourceRef="Task_ReturnToSender" targetRef="End_Returned" />
+    <bpmn:association id="Assoc_Refund" associationDirection="One" sourceRef="Bnd_PaymentComp" targetRef="Task_RefundCharges" />
+  </bpmn:process>
+  <bpmn:message id="Msg_Booking" name="shipment-booked" />
+  <bpmn:message id="Msg_CorrectedBooking" name="booking-corrected">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=bookingId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_Cancel" name="shipment-cancelled">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=trackingId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_Arrived" name="arrival-scan">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=trackingId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_Delay" name="delay-reported">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=trackingId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_CustomsDocs" name="customs-documents">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=trackingId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_Collected" name="parcel-collected-at-depot">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=trackingId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_Address" name="address-confirmed">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=trackingId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:error id="Err_ScanFailed" name="Scan failed" errorCode="SCAN_FAILED" />
+  <bpmn:error id="Err_Damaged" name="Parcel damaged" errorCode="PARCEL_DAMAGED" />
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_shipment-exception-management">
+      <bpmndi:BPMNShape id="Participant_Main_di" bpmnElement="Participant_Main" isHorizontal="true">
+        <dc:Bounds x="100" y="170" width="6058" height="1820" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ControlTower_di" bpmnElement="Lane_ControlTower" isHorizontal="true">
+        <dc:Bounds x="130" y="170" width="6028" height="390" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Hub_di" bpmnElement="Lane_Hub" isHorizontal="true">
+        <dc:Bounds x="130" y="560" width="6028" height="520" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Pickup_di" bpmnElement="Lane_Pickup" isHorizontal="true">
+        <dc:Bounds x="130" y="1080" width="6028" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Delivery_di" bpmnElement="Lane_Delivery" isHorizontal="true">
+        <dc:Bounds x="130" y="1340" width="6028" height="390" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Claims_di" bpmnElement="Lane_Claims" isHorizontal="true">
+        <dc:Bounds x="130" y="1730" width="6028" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_Shipper_di" bpmnElement="Participant_Shipper" isHorizontal="true" isExpanded="false">
+        <dc:Bounds x="100" y="60" width="6058" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_Recipient_di" bpmnElement="Participant_Recipient" isHorizontal="true" isExpanded="false">
+        <dc:Bounds x="100" y="2040" width="6058" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Transit_di" bpmnElement="Sub_Transit" isExpanded="true">
+        <dc:Bounds x="1967" y="568" width="1763" height="374" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Booking_di" bpmnElement="Start_Booking">
+        <dc:Bounds x="202" y="347" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="194" y="387" width="51" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_BookingMerge_di" bpmnElement="Gw_BookingMerge">
+        <dc:Bounds x="345" y="340" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ValidateBooking_di" bpmnElement="Task_ValidateBooking">
+        <dc:Bounds x="470" y="325" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_BookingValid_di" bpmnElement="Gw_BookingValid">
+        <dc:Bounds x="645" y="340" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="626" y="394" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RequestCorrection_di" bpmnElement="Task_RequestCorrection">
+        <dc:Bounds x="620" y="195" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AwaitCorrection_di" bpmnElement="Task_AwaitCorrection">
+        <dc:Bounds x="770" y="195" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_BookingLapsed_di" bpmnElement="End_BookingLapsed">
+        <dc:Bounds x="952" y="217" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="926" y="257" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_TakePayment_di" bpmnElement="Task_TakePayment">
+        <dc:Bounds x="770" y="325" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RefundCharges_di" bpmnElement="Task_RefundCharges">
+        <dc:Bounds x="920" y="455" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SchedulePickup_di" bpmnElement="Task_SchedulePickup">
+        <dc:Bounds x="920" y="325" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_PickupMerge_di" bpmnElement="Gw_PickupMerge">
+        <dc:Bounds x="1095" y="1120" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CollectParcel_di" bpmnElement="Task_CollectParcel">
+        <dc:Bounds x="1220" y="1105" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_PickupOk_di" bpmnElement="Gw_PickupOk">
+        <dc:Bounds x="1365" y="1120" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1419" y="1098" width="63" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_PickupRetry_di" bpmnElement="Gw_PickupRetry">
+        <dc:Bounds x="1365" y="1250" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1419" y="1228" width="69" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_NextPickup_di" bpmnElement="Catch_NextPickup">
+        <dc:Bounds x="1192" y="1257" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1232" y="1235" width="69" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Throw_RefundBooking_di" bpmnElement="Throw_RefundBooking">
+        <dc:Bounds x="1522" y="1257" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1502" y="1297" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_BookingCancelled_di" bpmnElement="End_BookingCancelled">
+        <dc:Bounds x="1672" y="1257" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1662" y="1297" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_DispatchSplit_di" bpmnElement="Gw_DispatchSplit">
+        <dc:Bounds x="1395" y="470" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_TrackingUpdate_di" bpmnElement="Task_TrackingUpdate">
+        <dc:Bounds x="1520" y="325" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_BookLinehaul_di" bpmnElement="Task_BookLinehaul">
+        <dc:Bounds x="1520" y="455" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_DispatchJoin_di" bpmnElement="Gw_DispatchJoin">
+        <dc:Bounds x="1695" y="470" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_TransitMerge_di" bpmnElement="Gw_TransitMerge">
+        <dc:Bounds x="1845" y="730" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RecallParcel_di" bpmnElement="Task_RecallParcel">
+        <dc:Bounds x="3380" y="455" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Throw_RefundCancel_di" bpmnElement="Throw_RefundCancel">
+        <dc:Bounds x="3592" y="477" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3572" y="517" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_International_di" bpmnElement="Gw_International">
+        <dc:Bounds x="3945" y="730" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3926" y="784" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_CustomsMerge_di" bpmnElement="Gw_CustomsMerge">
+        <dc:Bounds x="4095" y="600" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_FileCustoms_di" bpmnElement="Task_FileCustoms">
+        <dc:Bounds x="4220" y="585" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_CustomsCleared_di" bpmnElement="Gw_CustomsCleared">
+        <dc:Bounds x="4395" y="600" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4394" y="654" width="51" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RequestDocs_di" bpmnElement="Task_RequestDocs">
+        <dc:Bounds x="4370" y="455" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AwaitDocs_di" bpmnElement="Task_AwaitDocs">
+        <dc:Bounds x="4220" y="455" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_CustomsDone_di" bpmnElement="Gw_CustomsDone">
+        <dc:Bounds x="4545" y="730" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_OutForDelivery_di" bpmnElement="Task_OutForDelivery">
+        <dc:Bounds x="4670" y="1495" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_AttemptMerge_di" bpmnElement="Gw_AttemptMerge">
+        <dc:Bounds x="4845" y="1510" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AttemptDelivery_di" bpmnElement="Task_AttemptDelivery">
+        <dc:Bounds x="4970" y="1495" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_DeliveryOutcome_di" bpmnElement="Gw_DeliveryOutcome">
+        <dc:Bounds x="5145" y="1510" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5199" y="1556" width="51" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_AttemptsLeft_di" bpmnElement="Gw_AttemptsLeft">
+        <dc:Bounds x="5145" y="1640" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5066" y="1618" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_NextDay_di" bpmnElement="Catch_NextDay">
+        <dc:Bounds x="5002" y="1647" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4917" y="1625" width="81" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ContactRecipient_di" bpmnElement="Task_ContactRecipient">
+        <dc:Bounds x="5120" y="1365" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AwaitAddress_di" bpmnElement="Task_AwaitAddress">
+        <dc:Bounds x="5270" y="1365" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_HoldDepot_di" bpmnElement="Task_HoldDepot">
+        <dc:Bounds x="5270" y="975" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_DepotEvent_di" bpmnElement="Gw_DepotEvent">
+        <dc:Bounds x="5445" y="990" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5438" y="1044" width="63" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_Collected_di" bpmnElement="Catch_Collected">
+        <dc:Bounds x="5602" y="867" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5592" y="835" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_HoldExpired_di" bpmnElement="Catch_HoldExpired">
+        <dc:Bounds x="5602" y="997" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5586" y="1037" width="69" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_DeliveredMerge_di" bpmnElement="Gw_DeliveredMerge">
+        <dc:Bounds x="5745" y="340" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CloseShipment_di" bpmnElement="Task_CloseShipment">
+        <dc:Bounds x="5870" y="325" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Delivered_di" bpmnElement="End_Delivered">
+        <dc:Bounds x="6052" y="347" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="6042" y="387" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_ReturnMerge_di" bpmnElement="Gw_ReturnMerge">
+        <dc:Bounds x="5745" y="990" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReturnToSender_di" bpmnElement="Task_ReturnToSender">
+        <dc:Bounds x="5870" y="975" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Returned_di" bpmnElement="End_Returned">
+        <dc:Bounds x="6052" y="997" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="6036" y="1037" width="69" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_DamageMerge_di" bpmnElement="Gw_DamageMerge">
+        <dc:Bounds x="2145" y="1770" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_InspectDamage_di" bpmnElement="Task_InspectDamage">
+        <dc:Bounds x="2270" y="1755" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Insured_di" bpmnElement="Gw_Insured">
+        <dc:Bounds x="2445" y="1770" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2444" y="1752" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SettleClaim_di" bpmnElement="Task_SettleClaim">
+        <dc:Bounds x="2570" y="1755" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_ClaimSettled_di" bpmnElement="End_ClaimSettled">
+        <dc:Bounds x="2752" y="1777" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2730" y="1817" width="81" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_InformUninsured_di" bpmnElement="Task_InformUninsured">
+        <dc:Bounds x="2570" y="1885" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_DamageClosed_di" bpmnElement="End_DamageClosed">
+        <dc:Bounds x="2752" y="1907" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2742" y="1947" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_TraceParcel_di" bpmnElement="Task_TraceParcel">
+        <dc:Bounds x="3095" y="1885" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_DeclareLost_di" bpmnElement="Task_DeclareLost">
+        <dc:Bounds x="3275" y="1885" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Lost_di" bpmnElement="End_Lost">
+        <dc:Bounds x="3457" y="1907" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3432" y="1947" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_CorrectionTimeout_di" bpmnElement="Bnd_CorrectionTimeout">
+        <dc:Bounds x="852" y="217" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="892" y="195" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_PaymentComp_di" bpmnElement="Bnd_PaymentComp">
+        <dc:Bounds x="802" y="387" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="842" y="419" width="69" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_ScanFailed_di" bpmnElement="Bnd_ScanFailed">
+        <dc:Bounds x="2152" y="777" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2192" y="809" width="69" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_Cancel_di" bpmnElement="Bnd_Cancel">
+        <dc:Bounds x="3307" y="550" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3287" y="590" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_Damaged_di" bpmnElement="Bnd_Damaged">
+        <dc:Bounds x="2125" y="924" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2165" y="956" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_NoScan_di" bpmnElement="Bnd_NoScan">
+        <dc:Bounds x="2919" y="924" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2893" y="892" width="87" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_DocsTimeout_di" bpmnElement="Bnd_DocsTimeout">
+        <dc:Bounds x="4252" y="437" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4185" y="415" width="63" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_AddressTimeout_di" bpmnElement="Bnd_AddressTimeout">
+        <dc:Bounds x="5352" y="1387" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5392" y="1365" width="81" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_TraceTimeout_di" bpmnElement="Bnd_TraceTimeout">
+        <dc:Bounds x="3177" y="1907" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3217" y="1885" width="87" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Leg_di" bpmnElement="Start_Leg">
+        <dc:Bounds x="2002" y="737" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1986" y="777" width="69" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SortScan_di" bpmnElement="Task_SortScan">
+        <dc:Bounds x="2120" y="715" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ManualScan_di" bpmnElement="Task_ManualScan">
+        <dc:Bounds x="2120" y="845" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Reconcile_di" bpmnElement="Task_Reconcile">
+        <dc:Bounds x="2270" y="845" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_ScanMerge_di" bpmnElement="Gw_ScanMerge">
+        <dc:Bounds x="2295" y="730" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Intact_di" bpmnElement="Gw_Intact">
+        <dc:Bounds x="2445" y="730" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2426" y="784" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_DamageFound_di" bpmnElement="End_DamageFound">
+        <dc:Bounds x="2452" y="607" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2432" y="589" width="75" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Dispatch_di" bpmnElement="Task_Dispatch">
+        <dc:Bounds x="2570" y="715" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_WaitMerge_di" bpmnElement="Gw_WaitMerge">
+        <dc:Bounds x="2745" y="730" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_TransitEvent_di" bpmnElement="Gw_TransitEvent">
+        <dc:Bounds x="2895" y="730" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2949" y="776" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_Arrived_di" bpmnElement="Catch_Arrived">
+        <dc:Bounds x="3052" y="607" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3032" y="647" width="75" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_LegDone_di" bpmnElement="End_LegDone">
+        <dc:Bounds x="3202" y="607" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3180" y="647" width="81" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_DelayReported_di" bpmnElement="Catch_DelayReported">
+        <dc:Bounds x="3052" y="737" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3026" y="777" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Catch_EtaExceeded_di" bpmnElement="Catch_EtaExceeded">
+        <dc:Bounds x="3052" y="867" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3032" y="907" width="75" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_DelayMerge_di" bpmnElement="Gw_DelayMerge">
+        <dc:Bounds x="3195" y="730" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_DelaySplit_di" bpmnElement="Gw_DelaySplit">
+        <dc:Bounds x="3345" y="730" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3251" y="722" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NotifyEta_di" bpmnElement="Task_NotifyEta">
+        <dc:Bounds x="3470" y="585" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Reroute_di" bpmnElement="Task_Reroute">
+        <dc:Bounds x="3470" y="715" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AltVehicle_di" bpmnElement="Task_AltVehicle">
+        <dc:Bounds x="3470" y="845" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_DelayJoin_di" bpmnElement="Gw_DelayJoin">
+        <dc:Bounds x="3645" y="730" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_B1_di" bpmnElement="Flow_B1">
+        <di:waypoint x="238" y="365" />
+        <di:waypoint x="345" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_B2_di" bpmnElement="Flow_B2">
+        <di:waypoint x="395" y="365" />
+        <di:waypoint x="470" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_B3_di" bpmnElement="Flow_B3">
+        <di:waypoint x="570" y="365" />
+        <di:waypoint x="645" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_BookingOk_di" bpmnElement="Flow_BookingOk">
+        <di:waypoint x="695" y="365" />
+        <di:waypoint x="770" y="365" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="705" y="348" width="34" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_BookingBad_di" bpmnElement="Flow_BookingBad">
+        <di:waypoint x="670" y="340" />
+        <di:waypoint x="670" y="275" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="675" y="320" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_B4_di" bpmnElement="Flow_B4">
+        <di:waypoint x="720" y="235" />
+        <di:waypoint x="770" y="235" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Corrected_di" bpmnElement="Flow_Corrected">
+        <di:waypoint x="820" y="195" />
+        <di:waypoint x="820" y="184" />
+        <di:waypoint x="370" y="184" />
+        <di:waypoint x="370" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_B5_di" bpmnElement="Flow_B5">
+        <di:waypoint x="888" y="235" />
+        <di:waypoint x="952" y="235" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_B6_di" bpmnElement="Flow_B6">
+        <di:waypoint x="870" y="365" />
+        <di:waypoint x="920" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_B7_di" bpmnElement="Flow_B7">
+        <di:waypoint x="1020" y="365" />
+        <di:waypoint x="1120" y="365" />
+        <di:waypoint x="1120" y="1120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_P1_di" bpmnElement="Flow_P1">
+        <di:waypoint x="1145" y="1145" />
+        <di:waypoint x="1220" y="1145" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PickupYes_di" bpmnElement="Flow_PickupYes">
+        <di:waypoint x="1390" y="1300" />
+        <di:waypoint x="1390" y="1313" />
+        <di:waypoint x="1210" y="1313" />
+        <di:waypoint x="1210" y="1293" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1395" y="1306" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PickupNo_di" bpmnElement="Flow_PickupNo">
+        <di:waypoint x="1415" y="1275" />
+        <di:waypoint x="1522" y="1275" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1425" y="1258" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_P3_di" bpmnElement="Flow_P3">
+        <di:waypoint x="1210" y="1257" />
+        <di:waypoint x="1210" y="1184" />
+        <di:waypoint x="1120" y="1184" />
+        <di:waypoint x="1120" y="1170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_P4_di" bpmnElement="Flow_P4">
+        <di:waypoint x="1558" y="1275" />
+        <di:waypoint x="1672" y="1275" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_P5_di" bpmnElement="Flow_P5">
+        <di:waypoint x="1320" y="1145" />
+        <di:waypoint x="1365" y="1145" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PickedUp_di" bpmnElement="Flow_PickedUp">
+        <di:waypoint x="1390" y="1120" />
+        <di:waypoint x="1390" y="534" />
+        <di:waypoint x="1420" y="534" />
+        <di:waypoint x="1420" y="520" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1395" y="1100" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PickupFailed_di" bpmnElement="Flow_PickupFailed">
+        <di:waypoint x="1390" y="1170" />
+        <di:waypoint x="1390" y="1250" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1395" y="1176" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D1_di" bpmnElement="Flow_D1">
+        <di:waypoint x="1420" y="470" />
+        <di:waypoint x="1420" y="365" />
+        <di:waypoint x="1520" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D2_di" bpmnElement="Flow_D2">
+        <di:waypoint x="1445" y="495" />
+        <di:waypoint x="1520" y="495" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D3_di" bpmnElement="Flow_D3">
+        <di:waypoint x="1620" y="365" />
+        <di:waypoint x="1720" y="365" />
+        <di:waypoint x="1720" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D4_di" bpmnElement="Flow_D4">
+        <di:waypoint x="1620" y="495" />
+        <di:waypoint x="1695" y="495" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_D5_di" bpmnElement="Flow_D5">
+        <di:waypoint x="1745" y="495" />
+        <di:waypoint x="1870" y="495" />
+        <di:waypoint x="1870" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T0_di" bpmnElement="Flow_T0">
+        <di:waypoint x="1895" y="755" />
+        <di:waypoint x="1967" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T1_di" bpmnElement="Flow_T1">
+        <di:waypoint x="2038" y="755" />
+        <di:waypoint x="2120" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T2_di" bpmnElement="Flow_T2">
+        <di:waypoint x="2220" y="755" />
+        <di:waypoint x="2295" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T3_di" bpmnElement="Flow_T3">
+        <di:waypoint x="2170" y="813" />
+        <di:waypoint x="2170" y="845" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T4_di" bpmnElement="Flow_T4">
+        <di:waypoint x="2220" y="885" />
+        <di:waypoint x="2270" y="885" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T5_di" bpmnElement="Flow_T5">
+        <di:waypoint x="2320" y="845" />
+        <di:waypoint x="2320" y="780" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T6_di" bpmnElement="Flow_T6">
+        <di:waypoint x="2345" y="755" />
+        <di:waypoint x="2445" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_IntactYes_di" bpmnElement="Flow_IntactYes">
+        <di:waypoint x="2495" y="755" />
+        <di:waypoint x="2570" y="755" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2505" y="738" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_IntactNo_di" bpmnElement="Flow_IntactNo">
+        <di:waypoint x="2470" y="730" />
+        <di:waypoint x="2470" y="643" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2475" y="710" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T7_di" bpmnElement="Flow_T7">
+        <di:waypoint x="2670" y="755" />
+        <di:waypoint x="2745" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T8_di" bpmnElement="Flow_T8">
+        <di:waypoint x="2795" y="755" />
+        <di:waypoint x="2895" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T9_di" bpmnElement="Flow_T9">
+        <di:waypoint x="2920" y="730" />
+        <di:waypoint x="2920" y="625" />
+        <di:waypoint x="3052" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T10_di" bpmnElement="Flow_T10">
+        <di:waypoint x="2945" y="755" />
+        <di:waypoint x="3052" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T11_di" bpmnElement="Flow_T11">
+        <di:waypoint x="2920" y="780" />
+        <di:waypoint x="2920" y="885" />
+        <di:waypoint x="3052" y="885" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T12_di" bpmnElement="Flow_T12">
+        <di:waypoint x="3088" y="625" />
+        <di:waypoint x="3202" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T13_di" bpmnElement="Flow_T13">
+        <di:waypoint x="3088" y="755" />
+        <di:waypoint x="3195" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T14_di" bpmnElement="Flow_T14">
+        <di:waypoint x="3088" y="885" />
+        <di:waypoint x="3220" y="885" />
+        <di:waypoint x="3220" y="780" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T15_di" bpmnElement="Flow_T15">
+        <di:waypoint x="3245" y="755" />
+        <di:waypoint x="3345" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DelayNotify_di" bpmnElement="Flow_DelayNotify">
+        <di:waypoint x="3370" y="730" />
+        <di:waypoint x="3370" y="625" />
+        <di:waypoint x="3470" y="625" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3375" y="690" width="39" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DelayReroute_di" bpmnElement="Flow_DelayReroute">
+        <di:waypoint x="3395" y="755" />
+        <di:waypoint x="3470" y="755" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3405" y="738" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DelayVehicle_di" bpmnElement="Flow_DelayVehicle">
+        <di:waypoint x="3370" y="780" />
+        <di:waypoint x="3370" y="885" />
+        <di:waypoint x="3470" y="885" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3375" y="786" width="75" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T16_di" bpmnElement="Flow_T16">
+        <di:waypoint x="3570" y="625" />
+        <di:waypoint x="3670" y="625" />
+        <di:waypoint x="3670" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T17_di" bpmnElement="Flow_T17">
+        <di:waypoint x="3570" y="755" />
+        <di:waypoint x="3645" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T18_di" bpmnElement="Flow_T18">
+        <di:waypoint x="3570" y="885" />
+        <di:waypoint x="3670" y="885" />
+        <di:waypoint x="3670" y="780" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T19_di" bpmnElement="Flow_T19">
+        <di:waypoint x="3695" y="755" />
+        <di:waypoint x="3717" y="755" />
+        <di:waypoint x="3717" y="710" />
+        <di:waypoint x="2770" y="710" />
+        <di:waypoint x="2770" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_T20_di" bpmnElement="Flow_T20">
+        <di:waypoint x="3730" y="755" />
+        <di:waypoint x="3945" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Cancel_di" bpmnElement="Flow_Cancel">
+        <di:waypoint x="3325" y="550" />
+        <di:waypoint x="3325" y="495" />
+        <di:waypoint x="3380" y="495" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C2_di" bpmnElement="Flow_C2">
+        <di:waypoint x="3480" y="495" />
+        <di:waypoint x="3592" y="495" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C3_di" bpmnElement="Flow_C3">
+        <di:waypoint x="3628" y="495" />
+        <di:waypoint x="3745" y="495" />
+        <di:waypoint x="3745" y="911" />
+        <di:waypoint x="5770" y="911" />
+        <di:waypoint x="5770" y="990" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Damaged_di" bpmnElement="Flow_Damaged">
+        <di:waypoint x="2143" y="960" />
+        <di:waypoint x="2143" y="976" />
+        <di:waypoint x="2170" y="976" />
+        <di:waypoint x="2170" y="1770" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NoScan_di" bpmnElement="Flow_NoScan">
+        <di:waypoint x="2937" y="960" />
+        <di:waypoint x="2937" y="1925" />
+        <di:waypoint x="3095" y="1925" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Found_di" bpmnElement="Flow_Found">
+        <di:waypoint x="3145" y="1965" />
+        <di:waypoint x="3145" y="1976" />
+        <di:waypoint x="1870" y="1976" />
+        <di:waypoint x="1870" y="780" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_L1_di" bpmnElement="Flow_L1">
+        <di:waypoint x="3213" y="1925" />
+        <di:waypoint x="3275" y="1925" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_L2_di" bpmnElement="Flow_L2">
+        <di:waypoint x="3375" y="1925" />
+        <di:waypoint x="3457" y="1925" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_K1_di" bpmnElement="Flow_K1">
+        <di:waypoint x="2195" y="1795" />
+        <di:waypoint x="2270" y="1795" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_K2_di" bpmnElement="Flow_K2">
+        <di:waypoint x="2370" y="1795" />
+        <di:waypoint x="2445" y="1795" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_InsuredYes_di" bpmnElement="Flow_InsuredYes">
+        <di:waypoint x="2495" y="1795" />
+        <di:waypoint x="2570" y="1795" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2505" y="1778" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_InsuredNo_di" bpmnElement="Flow_InsuredNo">
+        <di:waypoint x="2470" y="1820" />
+        <di:waypoint x="2470" y="1925" />
+        <di:waypoint x="2570" y="1925" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2475" y="1826" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_K3_di" bpmnElement="Flow_K3">
+        <di:waypoint x="2670" y="1795" />
+        <di:waypoint x="2752" y="1795" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_K4_di" bpmnElement="Flow_K4">
+        <di:waypoint x="2670" y="1925" />
+        <di:waypoint x="2752" y="1925" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_IntlYes_di" bpmnElement="Flow_IntlYes">
+        <di:waypoint x="3995" y="755" />
+        <di:waypoint x="4120" y="755" />
+        <di:waypoint x="4120" y="650" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4005" y="738" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_IntlNo_di" bpmnElement="Flow_IntlNo">
+        <di:waypoint x="3995" y="755" />
+        <di:waypoint x="4545" y="755" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4005" y="759" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_X1_di" bpmnElement="Flow_X1">
+        <di:waypoint x="4145" y="625" />
+        <di:waypoint x="4220" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_X2_di" bpmnElement="Flow_X2">
+        <di:waypoint x="4320" y="625" />
+        <di:waypoint x="4395" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ClearedYes_di" bpmnElement="Flow_ClearedYes">
+        <di:waypoint x="4445" y="625" />
+        <di:waypoint x="4570" y="625" />
+        <di:waypoint x="4570" y="730" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4455" y="608" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ClearedNo_di" bpmnElement="Flow_ClearedNo">
+        <di:waypoint x="4420" y="600" />
+        <di:waypoint x="4420" y="535" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4425" y="580" width="28" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_X3_di" bpmnElement="Flow_X3">
+        <di:waypoint x="4420" y="455" />
+        <di:waypoint x="4420" y="444" />
+        <di:waypoint x="4270" y="444" />
+        <di:waypoint x="4270" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_X4_di" bpmnElement="Flow_X4">
+        <di:waypoint x="4270" y="535" />
+        <di:waypoint x="4270" y="546" />
+        <di:waypoint x="4120" y="546" />
+        <di:waypoint x="4120" y="600" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_X5_di" bpmnElement="Flow_X5">
+        <di:waypoint x="4270" y="437" />
+        <di:waypoint x="4270" y="417" />
+        <di:waypoint x="4627" y="417" />
+        <di:waypoint x="4627" y="968" />
+        <di:waypoint x="5770" y="968" />
+        <di:waypoint x="5770" y="990" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_X6_di" bpmnElement="Flow_X6">
+        <di:waypoint x="4570" y="780" />
+        <di:waypoint x="4570" y="1535" />
+        <di:waypoint x="4670" y="1535" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_V1_di" bpmnElement="Flow_V1">
+        <di:waypoint x="4770" y="1535" />
+        <di:waypoint x="4845" y="1535" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_V2_di" bpmnElement="Flow_V2">
+        <di:waypoint x="4895" y="1535" />
+        <di:waypoint x="4970" y="1535" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_V3_di" bpmnElement="Flow_V3">
+        <di:waypoint x="5070" y="1535" />
+        <di:waypoint x="5145" y="1535" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Delivered_di" bpmnElement="Flow_Delivered">
+        <di:waypoint x="5195" y="1535" />
+        <di:waypoint x="5245" y="1535" />
+        <di:waypoint x="5245" y="365" />
+        <di:waypoint x="5745" y="365" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5250" y="1513" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotHome_di" bpmnElement="Flow_NotHome">
+        <di:waypoint x="5170" y="1560" />
+        <di:waypoint x="5170" y="1640" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5096" y="1566" width="69" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_WrongAddr_di" bpmnElement="Flow_WrongAddr">
+        <di:waypoint x="5170" y="1510" />
+        <di:waypoint x="5170" y="1445" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5085" y="1490" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Refused_di" bpmnElement="Flow_Refused">
+        <di:waypoint x="5195" y="1535" />
+        <di:waypoint x="5770" y="1535" />
+        <di:waypoint x="5770" y="1040" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5775" y="1499" width="80" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DamagedAtDoor_di" bpmnElement="Flow_DamagedAtDoor">
+        <di:waypoint x="5170" y="1560" />
+        <di:waypoint x="5170" y="1586" />
+        <di:waypoint x="2123" y="1586" />
+        <di:waypoint x="2123" y="1795" />
+        <di:waypoint x="2145" y="1795" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5175" y="1586" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AttemptYes_di" bpmnElement="Flow_AttemptYes">
+        <di:waypoint x="5170" y="1690" />
+        <di:waypoint x="5170" y="1703" />
+        <di:waypoint x="5020" y="1703" />
+        <di:waypoint x="5020" y="1683" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5175" y="1696" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AttemptNo_di" bpmnElement="Flow_AttemptNo">
+        <di:waypoint x="5195" y="1665" />
+        <di:waypoint x="5227" y="1665" />
+        <di:waypoint x="5227" y="1015" />
+        <di:waypoint x="5270" y="1015" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5205" y="1648" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_V4_di" bpmnElement="Flow_V4">
+        <di:waypoint x="5020" y="1647" />
+        <di:waypoint x="5020" y="1580" />
+        <di:waypoint x="4870" y="1580" />
+        <di:waypoint x="4870" y="1560" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_V5_di" bpmnElement="Flow_V5">
+        <di:waypoint x="5220" y="1405" />
+        <di:waypoint x="5270" y="1405" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AddrOk_di" bpmnElement="Flow_AddrOk">
+        <di:waypoint x="5320" y="1365" />
+        <di:waypoint x="5320" y="1354" />
+        <di:waypoint x="4870" y="1354" />
+        <di:waypoint x="4870" y="1510" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_V6_di" bpmnElement="Flow_V6">
+        <di:waypoint x="5388" y="1405" />
+        <di:waypoint x="5770" y="1405" />
+        <di:waypoint x="5770" y="1040" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_V7_di" bpmnElement="Flow_V7">
+        <di:waypoint x="5370" y="1015" />
+        <di:waypoint x="5445" y="1015" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_V8_di" bpmnElement="Flow_V8">
+        <di:waypoint x="5470" y="990" />
+        <di:waypoint x="5470" y="885" />
+        <di:waypoint x="5602" y="885" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_V9_di" bpmnElement="Flow_V9">
+        <di:waypoint x="5495" y="1015" />
+        <di:waypoint x="5602" y="1015" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_V10_di" bpmnElement="Flow_V10">
+        <di:waypoint x="5638" y="885" />
+        <di:waypoint x="5770" y="885" />
+        <di:waypoint x="5770" y="390" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_V11_di" bpmnElement="Flow_V11">
+        <di:waypoint x="5638" y="1015" />
+        <di:waypoint x="5745" y="1015" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_E1_di" bpmnElement="Flow_E1">
+        <di:waypoint x="5795" y="365" />
+        <di:waypoint x="5870" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_E2_di" bpmnElement="Flow_E2">
+        <di:waypoint x="5970" y="365" />
+        <di:waypoint x="6052" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_R1_di" bpmnElement="Flow_R1">
+        <di:waypoint x="5795" y="1015" />
+        <di:waypoint x="5870" y="1015" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_R2_di" bpmnElement="Flow_R2">
+        <di:waypoint x="5970" y="1015" />
+        <di:waypoint x="6052" y="1015" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_Refund_di" bpmnElement="Assoc_Refund">
+        <di:waypoint x="820" y="423" />
+        <di:waypoint x="820" y="435" />
+        <di:waypoint x="970" y="435" />
+        <di:waypoint x="970" y="455" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Booking_di" bpmnElement="MsgFlow_Booking">
+        <di:waypoint x="220" y="120" />
+        <di:waypoint x="220" y="347" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="224" y="126" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_CorrReq_di" bpmnElement="MsgFlow_CorrReq">
+        <di:waypoint x="670" y="195" />
+        <di:waypoint x="670" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="674" y="126" width="39" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Corr_di" bpmnElement="MsgFlow_Corr">
+        <di:waypoint x="820" y="120" />
+        <di:waypoint x="820" y="195" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="824" y="126" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Tracking_di" bpmnElement="MsgFlow_Tracking">
+        <di:waypoint x="1570" y="325" />
+        <di:waypoint x="1570" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1574" y="126" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Cancel_di" bpmnElement="MsgFlow_Cancel">
+        <di:waypoint x="3325" y="120" />
+        <di:waypoint x="3325" y="550" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3329" y="126" width="39" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_DocsReq_di" bpmnElement="MsgFlow_DocsReq">
+        <di:waypoint x="4420" y="455" />
+        <di:waypoint x="4420" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4424" y="126" width="51" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Docs_di" bpmnElement="MsgFlow_Docs">
+        <di:waypoint x="4238" y="120" />
+        <di:waypoint x="4238" y="455" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4242" y="126" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Window_di" bpmnElement="MsgFlow_Window">
+        <di:waypoint x="4720" y="1575" />
+        <di:waypoint x="4720" y="2040" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4724" y="2006" width="51" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_AddrReq_di" bpmnElement="MsgFlow_AddrReq">
+        <di:waypoint x="5170" y="1445" />
+        <di:waypoint x="5170" y="1461" />
+        <di:waypoint x="5138" y="1461" />
+        <di:waypoint x="5138" y="2040" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5142" y="2020" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Addr_di" bpmnElement="MsgFlow_Addr">
+        <di:waypoint x="5320" y="2040" />
+        <di:waypoint x="5320" y="1445" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5324" y="2020" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -1,0 +1,1972 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_loan-origination" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.50.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.8.0">
+  <bpmn:collaboration id="Collaboration_loan-origination">
+    <bpmn:participant id="Participant_Main" name="Bank — Retail Lending" processRef="loan-origination" />
+    <bpmn:participant id="Participant_Applicant" name="Applicant">
+      <bpmn:documentation>The customer applying for the loan.</bpmn:documentation>
+    </bpmn:participant>
+    <bpmn:participant id="Participant_Bureau" name="Credit Bureau">
+      <bpmn:documentation>External credit bureau queried for the credit report and score.</bpmn:documentation>
+    </bpmn:participant>
+    <bpmn:messageFlow id="MsgFlow_App" name="Application" sourceRef="Participant_Applicant" targetRef="Start_Application" />
+    <bpmn:messageFlow id="MsgFlow_DocReq" name="Missing items" sourceRef="Task_RequestDocs" targetRef="Participant_Applicant" />
+    <bpmn:messageFlow id="MsgFlow_Docs" name="Documents" sourceRef="Participant_Applicant" targetRef="Task_AwaitDocs" />
+    <bpmn:messageFlow id="MsgFlow_Withdraw" name="Withdrawal" sourceRef="Participant_Applicant" targetRef="Start_Withdraw" />
+    <bpmn:messageFlow id="MsgFlow_Offer" name="Offer letter" sourceRef="Task_SendOffer" targetRef="Participant_Applicant" />
+    <bpmn:messageFlow id="MsgFlow_Accept" name="Acceptance" sourceRef="Participant_Applicant" targetRef="Task_AwaitAcceptance" />
+    <bpmn:messageFlow id="MsgFlow_Agreement" name="Agreement" sourceRef="Task_SendAgreement" targetRef="Participant_Applicant" />
+    <bpmn:messageFlow id="MsgFlow_Signed" name="Signed agreement" sourceRef="Participant_Applicant" targetRef="Task_AwaitSignature" />
+    <bpmn:messageFlow id="MsgFlow_BureauReq" name="Report request" sourceRef="Task_CreditScore" targetRef="Participant_Bureau" />
+    <bpmn:messageFlow id="MsgFlow_BureauResp" name="Credit report" sourceRef="Participant_Bureau" targetRef="Task_CreditScore" />
+  </bpmn:collaboration>
+  <bpmn:process id="loan-origination" name="Loan Origination and Approval" isExecutable="true">
+    <bpmn:documentation>Personal and secured loan applications from submission to disbursement. Shows the normal approval flow and every point where an application can stall, be rejected, be withdrawn or lapse (L1–L12).</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_Main">
+      <bpmn:lane id="Lane_Officer" name="Loan Officer">
+        <bpmn:documentation>Owns the applicant relationship: document requests, manual checks, offers and signatures.</bpmn:documentation>
+        <bpmn:flowNodeRef>Start_Application</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_DocsMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RequestDocs</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AwaitDocs</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_DocsTimeout</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Lapsed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ManualKYC</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_VerifyIncome</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Restructure</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SendOffer</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AwaitAcceptance</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_OfferExpired</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_OfferDeclined</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_OfferExpired</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_OfferDeclined</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_SignMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SendAgreement</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AwaitSignature</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_SignTimeout</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Sub_Withdrawal</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_System" name="Core Banking System">
+        <bpmn:documentation>Automated checks, scoring, offer generation, account creation and notifications.</bpmn:documentation>
+        <bpmn:flowNodeRef>Task_CheckDocs</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_DocsComplete</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CollectFee</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_FeeComp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RefundFee</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_VerifySplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_KYC</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_KycMatch</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_KycMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_FraudScreen</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CreditScore</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_BureauDown</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_CreditMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_VerifyJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_VerifyOutcome</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_ScoreMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Score</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_RiskDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_CounterMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_RestructuredBefore</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_RejectMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SendRejection</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Rejected</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_OfferMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GenerateOffer</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_VerifySignature</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_SignValid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_SignFailMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_SignRetry</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_OfferCancelled</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CreateAccount</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_AccountComp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CloseAccount</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_NotifyDisbursed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Disbursed</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Underwriting" name="Underwriter / Credit Committee">
+        <bpmn:documentation>Credit judgement, additional checks and high-value approvals.</bpmn:documentation>
+        <bpmn:flowNodeRef>Task_ManualCredit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_ChecksSplit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Collateral</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Guarantor</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_EDD</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_ChecksJoin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Underwrite</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_UwDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Committee</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_CommitteeSla</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_EscalateCCO</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_SlaEscalated</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_CommitteeDecision</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Compliance" name="Fraud &amp; Compliance Team">
+        <bpmn:documentation>Investigates fraud, AML and sanctions flags.</bpmn:documentation>
+        <bpmn:flowNodeRef>Sub_Investigation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_Fraud</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Freeze</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_Terminated</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Operations" name="Operations / Disbursement">
+        <bpmn:documentation>Beneficiary verification and payout.</bpmn:documentation>
+        <bpmn:flowNodeRef>Gw_AcctMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_VerifyBeneficiary</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_AcctValid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Disburse</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bnd_PaymentFailed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_HoldMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_HoldContact</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gw_Resolved</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Throw_ReverseAccount</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_DisbursementFailed</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_Application" name="Application received">
+      <bpmn:documentation>Message start: applicant submits the application form and supporting documents.</bpmn:documentation>
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Start_Application_messageDef" messageRef="Msg_Application" />
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="Gw_DocsMerge">
+      <bpmn:documentation>Merge: first submission and resubmitted documents.</bpmn:documentation>
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:businessRuleTask id="Task_CheckDocs" name="Check document completeness">
+      <bpmn:documentation>Rules list the documents required for this product (ID, address proof, income proof, collateral papers for secured loans) and check legibility flags from the OCR step.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="check-document-completeness" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="Gw_DocsComplete" name="Documents complete?" default="Flow_DocsNo">
+      <bpmn:documentation>L1 — exclusive: complete, or not (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_DocsYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_DocsNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="Task_RequestDocs" name="Request missing documents">
+      <bpmn:documentation>L1 — sends the applicant the list of missing / illegible items.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="request-missing-documents" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_DocsNo</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:receiveTask id="Task_AwaitDocs" name="Await documents" messageRef="Msg_Documents">
+      <bpmn:documentation>L1 — waits for the resubmission.</bpmn:documentation>
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:boundaryEvent id="Bnd_DocsTimeout" name="No response in 7 days" cancelActivity="true" attachedToRef="Task_AwaitDocs">
+      <bpmn:documentation>L1 — interrupting timer.</bpmn:documentation>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_DocsTimeout_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_Lapsed" name="Application lapsed">
+      <bpmn:documentation>Terminal: documents never provided.</bpmn:documentation>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_CollectFee" name="Collect processing fee">
+      <bpmn:documentation>Debits the processing fee.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="collect-processing-fee" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_DocsYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Bnd_FeeComp" name="Undo fee" cancelActivity="true" attachedToRef="Task_CollectFee">
+      <bpmn:documentation>Compensation boundary for the fee.</bpmn:documentation>
+      <bpmn:compensateEventDefinition id="Bnd_FeeComp_compensateDef" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="Task_RefundFee" name="Refund processing fee" isForCompensation="true">
+      <bpmn:documentation>Compensation handler: reverses the fee.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="refund-processing-fee" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:parallelGateway id="Gw_VerifySplit">
+      <bpmn:documentation>Parallel split: KYC, fraud screening, bureau score and income checks are independent and run together.</bpmn:documentation>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:serviceTask id="Task_KYC" name="Verify identity (KYC)">
+      <bpmn:documentation>Matches identity details against official records.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="verify-kyc" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_KycMatch" name="Identity matches?" default="Flow_KycNo">
+      <bpmn:documentation>L2 — exclusive: match, or mismatch (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_KycYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_KycNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_ManualKYC" name="Verify identity manually">
+      <bpmn:documentation>L2 — officer checks originals / video-KYC and records kycResolved.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/verify-identity-manually" />
+        <zeebe:assignmentDefinition candidateGroups="loan-officers" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_KycNo</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_KycMerge">
+      <bpmn:documentation>Merge: automatic or manual KYC.</bpmn:documentation>
+      <bpmn:incoming>Flow_KycYes</bpmn:incoming>
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_FraudScreen" name="Screen fraud, AML and sanctions">
+      <bpmn:documentation>L3 — document forensics, AML rules and sanctions-list lookup; sets complianceFlag.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="screen-fraud-aml" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_15</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_CreditScore" name="Retrieve credit score">
+      <bpmn:documentation>Requests the credit report from the bureau. Retries 3 times; after that the worker throws BUREAU_UNAVAILABLE.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="retrieve-credit-score" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_16</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Bnd_BureauDown" name="Bureau unavailable" cancelActivity="true" attachedToRef="Task_CreditScore">
+      <bpmn:documentation>L4 — bureau API timed out on every retry.</bpmn:documentation>
+      <bpmn:outgoing>Flow_17</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Bnd_BureauDown_errorDef" errorRef="Err_BureauDown" />
+    </bpmn:boundaryEvent>
+    <bpmn:userTask id="Task_ManualCredit" name="Perform manual credit assessment">
+      <bpmn:documentation>L4 — fallback: credit analyst assesses bank statements and repayment history directly.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/perform-manual-credit-assessment" />
+        <zeebe:assignmentDefinition candidateGroups="underwriters" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_17</bpmn:incoming>
+      <bpmn:outgoing>Flow_18</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_CreditMerge">
+      <bpmn:documentation>Merge: bureau or manual score.</bpmn:documentation>
+      <bpmn:incoming>Flow_16</bpmn:incoming>
+      <bpmn:incoming>Flow_18</bpmn:incoming>
+      <bpmn:outgoing>Flow_19</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_VerifyIncome" name="Verify income and employment">
+      <bpmn:documentation>Officer verifies salary slips / ITR and calls the employer.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/verify-income-and-employment" />
+        <zeebe:assignmentDefinition candidateGroups="loan-officers" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_20</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:parallelGateway id="Gw_VerifyJoin">
+      <bpmn:documentation>Parallel join: all four checks must finish.</bpmn:documentation>
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:incoming>Flow_15</bpmn:incoming>
+      <bpmn:incoming>Flow_19</bpmn:incoming>
+      <bpmn:incoming>Flow_20</bpmn:incoming>
+      <bpmn:outgoing>Flow_21</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:exclusiveGateway id="Gw_VerifyOutcome" name="Verification outcome?" default="Flow_AllClear">
+      <bpmn:documentation>Exclusive: compliance flag raised, identity still unresolved, or all clear (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_21</bpmn:incoming>
+      <bpmn:outgoing>Flow_Flag</bpmn:outgoing>
+      <bpmn:outgoing>Flow_IdUnresolved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_AllClear</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:subProcess id="Sub_Investigation" name="Compliance investigation">
+      <bpmn:documentation>Embedded sub-process run by Fraud &amp; Compliance. Throws FRAUD_CONFIRMED when the flag is upheld.</bpmn:documentation>
+      <bpmn:incoming>Flow_Flag</bpmn:incoming>
+      <bpmn:outgoing>Flow_I4</bpmn:outgoing>
+      <bpmn:startEvent id="Start_Inv" name="Flag received">
+        <bpmn:documentation>Blank start.</bpmn:documentation>
+        <bpmn:outgoing>Flow_I1</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:userTask id="Task_Investigate" name="Investigate compliance flag">
+        <bpmn:documentation>L3 — investigator reviews forged-document indicators, AML pattern or sanctions hit.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:userTask />
+          <zeebe:formDefinition externalReference="/forms/investigate-compliance-flag" />
+          <zeebe:assignmentDefinition candidateGroups="compliance" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_I1</bpmn:incoming>
+        <bpmn:outgoing>Flow_I2</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:exclusiveGateway id="Gw_Confirmed" name="Fraud / AML confirmed?" default="Flow_ConfNo">
+        <bpmn:documentation>L3 — exclusive: confirmed, or cleared (default).</bpmn:documentation>
+        <bpmn:incoming>Flow_I2</bpmn:incoming>
+        <bpmn:outgoing>Flow_ConfYes</bpmn:outgoing>
+        <bpmn:outgoing>Flow_ConfNo</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:endEvent id="End_Cleared" name="Flag cleared">
+        <bpmn:documentation>Sub-process completes; application continues.</bpmn:documentation>
+        <bpmn:incoming>Flow_ConfNo</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:serviceTask id="Task_FileSAR" name="File suspicious-activity report">
+        <bpmn:documentation>L3 — internal / regulatory report filed.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="file-sar" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_ConfYes</bpmn:incoming>
+        <bpmn:outgoing>Flow_I3</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:endEvent id="End_FraudConfirmed" name="Fraud confirmed">
+        <bpmn:documentation>Error end: throws FRAUD_CONFIRMED.</bpmn:documentation>
+        <bpmn:incoming>Flow_I3</bpmn:incoming>
+        <bpmn:errorEventDefinition id="End_FraudConfirmed_errorDef" errorRef="Err_FraudConfirmed" />
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_I1" sourceRef="Start_Inv" targetRef="Task_Investigate" />
+      <bpmn:sequenceFlow id="Flow_I2" sourceRef="Task_Investigate" targetRef="Gw_Confirmed" />
+      <bpmn:sequenceFlow id="Flow_ConfYes" name="Yes" sourceRef="Gw_Confirmed" targetRef="Task_FileSAR">
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=fraudConfirmed = true</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_ConfNo" name="No" sourceRef="Gw_Confirmed" targetRef="End_Cleared" />
+      <bpmn:sequenceFlow id="Flow_I3" sourceRef="Task_FileSAR" targetRef="End_FraudConfirmed" />
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="Bnd_Fraud" name="Fraud confirmed" cancelActivity="true" attachedToRef="Sub_Investigation">
+      <bpmn:documentation>L3 — catches FRAUD_CONFIRMED.</bpmn:documentation>
+      <bpmn:outgoing>Flow_I5</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Bnd_Fraud_errorDef" errorRef="Err_FraudConfirmed" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="Task_Freeze" name="Freeze customer and close file">
+      <bpmn:documentation>L3 — blocks the customer record and closes the application.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="freeze-and-close" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_I5</bpmn:incoming>
+      <bpmn:outgoing>Flow_I6</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End_Terminated" name="Rejected — compliance">
+      <bpmn:documentation>L3 — terminate end: kills every remaining token (including the withdrawal listener) immediately.</bpmn:documentation>
+      <bpmn:incoming>Flow_I6</bpmn:incoming>
+      <bpmn:terminateEventDefinition id="End_Terminated_terminateDef" />
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gw_ScoreMerge">
+      <bpmn:documentation>Merge: all clear, flag cleared, or restructured terms to re-score.</bpmn:documentation>
+      <bpmn:incoming>Flow_AllClear</bpmn:incoming>
+      <bpmn:incoming>Flow_I4</bpmn:incoming>
+      <bpmn:incoming>Flow_24</bpmn:incoming>
+      <bpmn:outgoing>Flow_22</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:businessRuleTask id="Task_Score" name="Score eligibility and risk">
+      <bpmn:documentation>Decision table over credit score, debt-to-income, loan-to-value and amount: AUTO_APPROVE, MANUAL_REVIEW, COUNTER_OFFER or REJECT.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="score-application" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_22</bpmn:incoming>
+      <bpmn:outgoing>Flow_23</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="Gw_RiskDecision" name="Risk decision?" default="Flow_Manual">
+      <bpmn:documentation>Exclusive four-way split. Manual review is the default, so an unexpected result goes to a human, never to an automatic approval.</bpmn:documentation>
+      <bpmn:incoming>Flow_23</bpmn:incoming>
+      <bpmn:outgoing>Flow_AutoApprove</bpmn:outgoing>
+      <bpmn:outgoing>Flow_AutoReject</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Counter</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Manual</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_CounterMerge">
+      <bpmn:documentation>Merge: counter-offers from scoring and from the underwriter.</bpmn:documentation>
+      <bpmn:incoming>Flow_Counter</bpmn:incoming>
+      <bpmn:incoming>Flow_UwCounter</bpmn:incoming>
+      <bpmn:outgoing>Flow_CounterMerged</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_RestructuredBefore" name="Already restructured?" default="Flow_RestructNo">
+      <bpmn:documentation>L5 / L6 — bounded loop: terms are restructured at most once.</bpmn:documentation>
+      <bpmn:incoming>Flow_CounterMerged</bpmn:incoming>
+      <bpmn:outgoing>Flow_RestructYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_RestructNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_Restructure" name="Propose restructured terms">
+      <bpmn:documentation>L5 / L6 — officer agrees a smaller amount, longer tenure, guarantor or extra collateral with the applicant.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/propose-restructured-terms" />
+        <zeebe:assignmentDefinition candidateGroups="loan-officers" />
+        <zeebe:ioMapping>
+          <zeebe:output source="=true" target="restructured" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_RestructYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_24</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:inclusiveGateway id="Gw_ChecksSplit" name="Extra checks required?" default="Flow_ChkNone">
+      <bpmn:documentation>L7 / L8 — inclusive split: any combination of checks applies; the default (none) is taken only when no condition holds.</bpmn:documentation>
+      <bpmn:incoming>Flow_Manual</bpmn:incoming>
+      <bpmn:outgoing>Flow_ChkCollateral</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ChkGuarantor</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ChkEDD</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ChkNone</bpmn:outgoing>
+    </bpmn:inclusiveGateway>
+    <bpmn:userTask id="Task_Collateral" name="Value collateral and check title">
+      <bpmn:documentation>L8 — secured loans only.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/value-collateral-and-check-title" />
+        <zeebe:assignmentDefinition candidateGroups="valuers" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ChkCollateral</bpmn:incoming>
+      <bpmn:outgoing>Flow_25</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Task_Guarantor" name="Verify guarantor">
+      <bpmn:documentation>When a guarantor is part of the terms.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/verify-guarantor" />
+        <zeebe:assignmentDefinition candidateGroups="underwriters" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ChkGuarantor</bpmn:incoming>
+      <bpmn:outgoing>Flow_26</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Task_EDD" name="Enhanced due diligence">
+      <bpmn:documentation>L7 — amount above the policy threshold.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/enhanced-due-diligence" />
+        <zeebe:assignmentDefinition candidateGroups="underwriters" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ChkEDD</bpmn:incoming>
+      <bpmn:outgoing>Flow_27</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:inclusiveGateway id="Gw_ChecksJoin">
+      <bpmn:documentation>Inclusive join: waits only for the checks actually started.</bpmn:documentation>
+      <bpmn:incoming>Flow_ChkNone</bpmn:incoming>
+      <bpmn:incoming>Flow_25</bpmn:incoming>
+      <bpmn:incoming>Flow_26</bpmn:incoming>
+      <bpmn:incoming>Flow_27</bpmn:incoming>
+      <bpmn:outgoing>Flow_28</bpmn:outgoing>
+    </bpmn:inclusiveGateway>
+    <bpmn:userTask id="Task_Underwrite" name="Underwrite application">
+      <bpmn:documentation>Underwriter decides APPROVE, REJECT, COUNTER_OFFER (e.g. low valuation → lower LTV) or ESCALATE (above authority / borderline).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/underwrite-application" />
+        <zeebe:assignmentDefinition candidateGroups="underwriters" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_28</bpmn:incoming>
+      <bpmn:outgoing>Flow_29</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_UwDecision" name="Underwriting decision?" default="Flow_UwReject">
+      <bpmn:documentation>Exclusive; reject is the default.</bpmn:documentation>
+      <bpmn:incoming>Flow_29</bpmn:incoming>
+      <bpmn:outgoing>Flow_UwApprove</bpmn:outgoing>
+      <bpmn:outgoing>Flow_UwCounter</bpmn:outgoing>
+      <bpmn:outgoing>Flow_UwEscalate</bpmn:outgoing>
+      <bpmn:outgoing>Flow_UwReject</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_Committee" name="Credit committee review">
+      <bpmn:documentation>L7 — senior committee decides high-value / borderline cases.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/credit-committee-review" />
+        <zeebe:assignmentDefinition candidateGroups="credit-committee" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_UwEscalate</bpmn:incoming>
+      <bpmn:outgoing>Flow_30</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:boundaryEvent id="Bnd_CommitteeSla" name="SLA 5 days passed" cancelActivity="false" attachedToRef="Task_Committee">
+      <bpmn:documentation>L7 — non-interrupting: escalate without stopping the review.</bpmn:documentation>
+      <bpmn:outgoing>Flow_31</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_CommitteeSla_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P5D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:sendTask id="Task_EscalateCCO" name="Escalate to chief credit officer">
+      <bpmn:documentation>L7 — SLA breach escalation.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="escalate-cco" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_31</bpmn:incoming>
+      <bpmn:outgoing>Flow_32</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="End_SlaEscalated" name="Escalated">
+      <bpmn:documentation>Ends the escalation branch only.</bpmn:documentation>
+      <bpmn:incoming>Flow_32</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gw_CommitteeDecision" name="Committee approves?" default="Flow_CommReject">
+      <bpmn:documentation>Exclusive; reject is the default.</bpmn:documentation>
+      <bpmn:incoming>Flow_30</bpmn:incoming>
+      <bpmn:outgoing>Flow_CommApprove</bpmn:outgoing>
+      <bpmn:outgoing>Flow_CommReject</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_RejectMerge">
+      <bpmn:documentation>Merge: every rejection route.</bpmn:documentation>
+      <bpmn:incoming>Flow_IdUnresolved</bpmn:incoming>
+      <bpmn:incoming>Flow_AutoReject</bpmn:incoming>
+      <bpmn:incoming>Flow_RestructNo</bpmn:incoming>
+      <bpmn:incoming>Flow_UwReject</bpmn:incoming>
+      <bpmn:incoming>Flow_CommReject</bpmn:incoming>
+      <bpmn:outgoing>Flow_33</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="Task_SendRejection" name="Send rejection with reason codes">
+      <bpmn:documentation>Adverse-action notice with reason codes.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-rejection" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_33</bpmn:incoming>
+      <bpmn:outgoing>Flow_34</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="End_Rejected" name="Application rejected">
+      <bpmn:documentation>Terminal.</bpmn:documentation>
+      <bpmn:incoming>Flow_34</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gw_OfferMerge">
+      <bpmn:documentation>Merge: auto-approved, underwriter-approved, committee-approved.</bpmn:documentation>
+      <bpmn:incoming>Flow_AutoApprove</bpmn:incoming>
+      <bpmn:incoming>Flow_UwApprove</bpmn:incoming>
+      <bpmn:incoming>Flow_CommApprove</bpmn:incoming>
+      <bpmn:outgoing>Flow_35</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:scriptTask id="Task_GenerateOffer" name="Generate loan offer">
+      <bpmn:documentation>Computes the EMI for the approved amount, rate and tenure (inline FEEL, no worker needed).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:script expression="=approvedAmount * monthlyRate / (1 - (1 + monthlyRate) ** (-tenureMonths))" resultVariable="emi" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_35</bpmn:incoming>
+      <bpmn:outgoing>Flow_36</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:sendTask id="Task_SendOffer" name="Send offer to applicant">
+      <bpmn:documentation>Sends the offer letter with validity date.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-offer" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_36</bpmn:incoming>
+      <bpmn:outgoing>Flow_37</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:receiveTask id="Task_AwaitAcceptance" name="Await offer acceptance" messageRef="Msg_OfferAccepted">
+      <bpmn:documentation>Waits for the applicant to accept.</bpmn:documentation>
+      <bpmn:incoming>Flow_37</bpmn:incoming>
+      <bpmn:outgoing>Flow_40</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:boundaryEvent id="Bnd_OfferExpired" name="Offer validity (15 days) over" cancelActivity="true" attachedToRef="Task_AwaitAcceptance">
+      <bpmn:documentation>L9 — interrupting timer.</bpmn:documentation>
+      <bpmn:outgoing>Flow_38</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_OfferExpired_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P15D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Bnd_OfferDeclined" name="Offer declined" cancelActivity="true" attachedToRef="Task_AwaitAcceptance">
+      <bpmn:documentation>L9 — applicant refuses the offer.</bpmn:documentation>
+      <bpmn:outgoing>Flow_39</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="Bnd_OfferDeclined_messageDef" messageRef="Msg_OfferDeclined" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_OfferExpired" name="Offer expired">
+      <bpmn:documentation>Terminal.</bpmn:documentation>
+      <bpmn:incoming>Flow_38</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="End_OfferDeclined" name="Offer declined">
+      <bpmn:documentation>Terminal.</bpmn:documentation>
+      <bpmn:incoming>Flow_39</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gw_SignMerge">
+      <bpmn:documentation>Merge: first and repeated signature requests.</bpmn:documentation>
+      <bpmn:incoming>Flow_40</bpmn:incoming>
+      <bpmn:incoming>Flow_SignRetryYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_41</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="Task_SendAgreement" name="Send agreement for e-signature">
+      <bpmn:documentation>Sends the loan agreement to the e-sign provider.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-agreement" />
+        <zeebe:ioMapping>
+          <zeebe:output source="=if signAttempts = null then 1 else signAttempts + 1" target="signAttempts" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_41</bpmn:incoming>
+      <bpmn:outgoing>Flow_42</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:receiveTask id="Task_AwaitSignature" name="Await signed agreement" messageRef="Msg_Signed">
+      <bpmn:documentation>Waits for the signed agreement.</bpmn:documentation>
+      <bpmn:incoming>Flow_42</bpmn:incoming>
+      <bpmn:outgoing>Flow_43</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:boundaryEvent id="Bnd_SignTimeout" name="Not signed in 5 days" cancelActivity="true" attachedToRef="Task_AwaitSignature">
+      <bpmn:documentation>L11 — interrupting timer.</bpmn:documentation>
+      <bpmn:outgoing>Flow_44</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="Bnd_SignTimeout_timerDef">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P5D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="Task_VerifySignature" name="Verify signature">
+      <bpmn:documentation>Validates the e-signature certificate and signer identity.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="verify-signature" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_43</bpmn:incoming>
+      <bpmn:outgoing>Flow_45</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_SignValid" name="Signature valid?" default="Flow_SignBad">
+      <bpmn:documentation>L11 — exclusive: valid, or mismatch (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_45</bpmn:incoming>
+      <bpmn:outgoing>Flow_SignOk</bpmn:outgoing>
+      <bpmn:outgoing>Flow_SignBad</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_SignFailMerge">
+      <bpmn:documentation>Merge: signature mismatch or not signed in time.</bpmn:documentation>
+      <bpmn:incoming>Flow_44</bpmn:incoming>
+      <bpmn:incoming>Flow_SignBad</bpmn:incoming>
+      <bpmn:outgoing>Flow_46</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gw_SignRetry" name="Fewer than 2 attempts?" default="Flow_SignRetryNo">
+      <bpmn:documentation>L11 — bounded loop: 2 signature attempts.</bpmn:documentation>
+      <bpmn:incoming>Flow_46</bpmn:incoming>
+      <bpmn:outgoing>Flow_SignRetryYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_SignRetryNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_OfferCancelled" name="Offer cancelled">
+      <bpmn:documentation>Terminal: agreement never validly signed.</bpmn:documentation>
+      <bpmn:incoming>Flow_SignRetryNo</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_CreateAccount" name="Create loan account">
+      <bpmn:documentation>Opens the loan account and repayment schedule.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="create-loan-account" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_SignOk</bpmn:incoming>
+      <bpmn:outgoing>Flow_47</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Bnd_AccountComp" name="Undo account" cancelActivity="true" attachedToRef="Task_CreateAccount">
+      <bpmn:documentation>Compensation boundary for the loan account.</bpmn:documentation>
+      <bpmn:compensateEventDefinition id="Bnd_AccountComp_compensateDef" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="Task_CloseAccount" name="Reverse loan account" isForCompensation="true">
+      <bpmn:documentation>Compensation handler: closes the account and cancels the schedule.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="reverse-loan-account" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_AcctMerge">
+      <bpmn:documentation>Merge: first payout and retry after the issue is fixed.</bpmn:documentation>
+      <bpmn:incoming>Flow_47</bpmn:incoming>
+      <bpmn:incoming>Flow_ResolvedYes</bpmn:incoming>
+      <bpmn:outgoing>Flow_48</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_VerifyBeneficiary" name="Verify beneficiary account">
+      <bpmn:documentation>L12 — penny-drop / name match on the payout account.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="verify-beneficiary" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_48</bpmn:incoming>
+      <bpmn:outgoing>Flow_49</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gw_AcctValid" name="Account valid?" default="Flow_AcctBad">
+      <bpmn:documentation>L12 — exclusive: valid, or invalid (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_49</bpmn:incoming>
+      <bpmn:outgoing>Flow_AcctOk</bpmn:outgoing>
+      <bpmn:outgoing>Flow_AcctBad</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Disburse" name="Disburse funds">
+      <bpmn:documentation>Pays out through the payment gateway. Retries 3 times, then throws PAYMENT_FAILED.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="disburse-funds" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_AcctOk</bpmn:incoming>
+      <bpmn:outgoing>Flow_54</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Bnd_PaymentFailed" name="Payment failed" cancelActivity="true" attachedToRef="Task_Disburse">
+      <bpmn:documentation>L12 — gateway error after all retries.</bpmn:documentation>
+      <bpmn:outgoing>Flow_50</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="Bnd_PaymentFailed_errorDef" errorRef="Err_PaymentFailed" />
+    </bpmn:boundaryEvent>
+    <bpmn:exclusiveGateway id="Gw_HoldMerge">
+      <bpmn:documentation>Merge: invalid account or failed payment.</bpmn:documentation>
+      <bpmn:incoming>Flow_AcctBad</bpmn:incoming>
+      <bpmn:incoming>Flow_50</bpmn:incoming>
+      <bpmn:outgoing>Flow_51</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Task_HoldContact" name="Hold funds and contact applicant">
+      <bpmn:documentation>L12 — funds held; operations obtains correct bank details.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition externalReference="/forms/hold-funds-and-contact-applicant" />
+        <zeebe:assignmentDefinition candidateGroups="operations" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_51</bpmn:incoming>
+      <bpmn:outgoing>Flow_52</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gw_Resolved" name="Resolved?" default="Flow_ResolvedNo">
+      <bpmn:documentation>L12 — exclusive: fixed (retry), or not (default).</bpmn:documentation>
+      <bpmn:incoming>Flow_52</bpmn:incoming>
+      <bpmn:outgoing>Flow_ResolvedYes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ResolvedNo</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateThrowEvent id="Throw_ReverseAccount" name="Reverse loan account">
+      <bpmn:documentation>L12 — compensation: undoes the loan account creation (and refunds the processing fee).</bpmn:documentation>
+      <bpmn:incoming>Flow_ResolvedNo</bpmn:incoming>
+      <bpmn:outgoing>Flow_53</bpmn:outgoing>
+      <bpmn:compensateEventDefinition id="Throw_ReverseAccount_compensateDef" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:endEvent id="End_DisbursementFailed" name="Disbursement failed">
+      <bpmn:documentation>Terminal.</bpmn:documentation>
+      <bpmn:incoming>Flow_53</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sendTask id="Task_NotifyDisbursed" name="Notify applicant of disbursement">
+      <bpmn:documentation>Sends the disbursement advice and repayment schedule.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="notify-disbursement" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_54</bpmn:incoming>
+      <bpmn:outgoing>Flow_55</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="End_Disbursed" name="Loan disbursed">
+      <bpmn:documentation>Successful end.</bpmn:documentation>
+      <bpmn:incoming>Flow_55</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:subProcess id="Sub_Withdrawal" name="Withdrawal at any stage" triggeredByEvent="true">
+      <bpmn:documentation>L10 — interrupting event sub-process: a withdrawal message cancels whatever is running.</bpmn:documentation>
+      <bpmn:startEvent id="Start_Withdraw" name="Withdrawal requested">
+        <bpmn:documentation>Interrupting message start.</bpmn:documentation>
+        <bpmn:outgoing>Flow_W1</bpmn:outgoing>
+        <bpmn:messageEventDefinition id="Start_Withdraw_messageDef" messageRef="Msg_Withdraw" />
+      </bpmn:startEvent>
+      <bpmn:intermediateThrowEvent id="Throw_Undo" name="Reverse fees and holds">
+        <bpmn:documentation>Compensation throw: refunds the processing fee and reverses the loan account if they were completed.</bpmn:documentation>
+        <bpmn:incoming>Flow_W1</bpmn:incoming>
+        <bpmn:outgoing>Flow_W2</bpmn:outgoing>
+        <bpmn:compensateEventDefinition id="Throw_Undo_compensateDef" />
+      </bpmn:intermediateThrowEvent>
+      <bpmn:sendTask id="Task_ConfirmWithdrawal" name="Confirm withdrawal">
+        <bpmn:documentation>Confirms closure to the applicant.</bpmn:documentation>
+        <bpmn:extensionElements>
+          <zeebe:taskDefinition type="confirm-withdrawal" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>Flow_W2</bpmn:incoming>
+        <bpmn:outgoing>Flow_W3</bpmn:outgoing>
+      </bpmn:sendTask>
+      <bpmn:endEvent id="End_Withdrawn" name="Withdrawn">
+        <bpmn:documentation>Terminal.</bpmn:documentation>
+        <bpmn:incoming>Flow_W3</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_W1" sourceRef="Start_Withdraw" targetRef="Throw_Undo" />
+      <bpmn:sequenceFlow id="Flow_W2" sourceRef="Throw_Undo" targetRef="Task_ConfirmWithdrawal" />
+      <bpmn:sequenceFlow id="Flow_W3" sourceRef="Task_ConfirmWithdrawal" targetRef="End_Withdrawn" />
+    </bpmn:subProcess>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_Application" targetRef="Gw_DocsMerge" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Gw_DocsMerge" targetRef="Task_CheckDocs" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_CheckDocs" targetRef="Gw_DocsComplete" />
+    <bpmn:sequenceFlow id="Flow_DocsYes" name="Yes" sourceRef="Gw_DocsComplete" targetRef="Task_CollectFee">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=documentsComplete = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_DocsNo" name="No" sourceRef="Gw_DocsComplete" targetRef="Task_RequestDocs" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_RequestDocs" targetRef="Task_AwaitDocs" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_AwaitDocs" targetRef="Gw_DocsMerge" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Bnd_DocsTimeout" targetRef="End_Lapsed" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_CollectFee" targetRef="Gw_VerifySplit" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Gw_VerifySplit" targetRef="Task_KYC" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Gw_VerifySplit" targetRef="Task_FraudScreen" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Gw_VerifySplit" targetRef="Task_CreditScore" />
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Gw_VerifySplit" targetRef="Task_VerifyIncome" />
+    <bpmn:sequenceFlow id="Flow_12" sourceRef="Task_KYC" targetRef="Gw_KycMatch" />
+    <bpmn:sequenceFlow id="Flow_KycYes" name="Yes" sourceRef="Gw_KycMatch" targetRef="Gw_KycMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=kycMatch = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_KycNo" name="No" sourceRef="Gw_KycMatch" targetRef="Task_ManualKYC" />
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="Task_ManualKYC" targetRef="Gw_KycMerge" />
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="Gw_KycMerge" targetRef="Gw_VerifyJoin" />
+    <bpmn:sequenceFlow id="Flow_15" sourceRef="Task_FraudScreen" targetRef="Gw_VerifyJoin" />
+    <bpmn:sequenceFlow id="Flow_16" sourceRef="Task_CreditScore" targetRef="Gw_CreditMerge" />
+    <bpmn:sequenceFlow id="Flow_17" sourceRef="Bnd_BureauDown" targetRef="Task_ManualCredit" />
+    <bpmn:sequenceFlow id="Flow_18" sourceRef="Task_ManualCredit" targetRef="Gw_CreditMerge" />
+    <bpmn:sequenceFlow id="Flow_19" sourceRef="Gw_CreditMerge" targetRef="Gw_VerifyJoin" />
+    <bpmn:sequenceFlow id="Flow_20" sourceRef="Task_VerifyIncome" targetRef="Gw_VerifyJoin" />
+    <bpmn:sequenceFlow id="Flow_21" sourceRef="Gw_VerifyJoin" targetRef="Gw_VerifyOutcome" />
+    <bpmn:sequenceFlow id="Flow_Flag" name="Compliance flag" sourceRef="Gw_VerifyOutcome" targetRef="Sub_Investigation">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=complianceFlag = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_IdUnresolved" name="Identity unresolved" sourceRef="Gw_VerifyOutcome" targetRef="Gw_RejectMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=kycMatch = false and kycResolved != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AllClear" name="All clear" sourceRef="Gw_VerifyOutcome" targetRef="Gw_ScoreMerge" />
+    <bpmn:sequenceFlow id="Flow_I4" sourceRef="Sub_Investigation" targetRef="Gw_ScoreMerge" />
+    <bpmn:sequenceFlow id="Flow_I5" sourceRef="Bnd_Fraud" targetRef="Task_Freeze" />
+    <bpmn:sequenceFlow id="Flow_I6" sourceRef="Task_Freeze" targetRef="End_Terminated" />
+    <bpmn:sequenceFlow id="Flow_22" sourceRef="Gw_ScoreMerge" targetRef="Task_Score" />
+    <bpmn:sequenceFlow id="Flow_23" sourceRef="Task_Score" targetRef="Gw_RiskDecision" />
+    <bpmn:sequenceFlow id="Flow_AutoApprove" name="Auto-approve" sourceRef="Gw_RiskDecision" targetRef="Gw_OfferMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=risk.decision = "AUTO_APPROVE"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AutoReject" name="Reject" sourceRef="Gw_RiskDecision" targetRef="Gw_RejectMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=risk.decision = "REJECT"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Counter" name="Counter-offer" sourceRef="Gw_RiskDecision" targetRef="Gw_CounterMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=risk.decision = "COUNTER_OFFER"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Manual" name="Manual review" sourceRef="Gw_RiskDecision" targetRef="Gw_ChecksSplit" />
+    <bpmn:sequenceFlow id="Flow_CounterMerged" sourceRef="Gw_CounterMerge" targetRef="Gw_RestructuredBefore" />
+    <bpmn:sequenceFlow id="Flow_RestructYes" name="No" sourceRef="Gw_RestructuredBefore" targetRef="Task_Restructure">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=restructured != true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_RestructNo" name="Yes" sourceRef="Gw_RestructuredBefore" targetRef="Gw_RejectMerge" />
+    <bpmn:sequenceFlow id="Flow_24" sourceRef="Task_Restructure" targetRef="Gw_ScoreMerge" />
+    <bpmn:sequenceFlow id="Flow_ChkCollateral" name="Secured loan" sourceRef="Gw_ChecksSplit" targetRef="Task_Collateral">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=secured = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ChkGuarantor" name="Has guarantor" sourceRef="Gw_ChecksSplit" targetRef="Task_Guarantor">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=hasGuarantor = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ChkEDD" name="Above threshold" sourceRef="Gw_ChecksSplit" targetRef="Task_EDD">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=loanAmount &gt; eddThreshold</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ChkNone" name="None" sourceRef="Gw_ChecksSplit" targetRef="Gw_ChecksJoin" />
+    <bpmn:sequenceFlow id="Flow_25" sourceRef="Task_Collateral" targetRef="Gw_ChecksJoin" />
+    <bpmn:sequenceFlow id="Flow_26" sourceRef="Task_Guarantor" targetRef="Gw_ChecksJoin" />
+    <bpmn:sequenceFlow id="Flow_27" sourceRef="Task_EDD" targetRef="Gw_ChecksJoin" />
+    <bpmn:sequenceFlow id="Flow_28" sourceRef="Gw_ChecksJoin" targetRef="Task_Underwrite" />
+    <bpmn:sequenceFlow id="Flow_29" sourceRef="Task_Underwrite" targetRef="Gw_UwDecision" />
+    <bpmn:sequenceFlow id="Flow_UwApprove" name="Approve" sourceRef="Gw_UwDecision" targetRef="Gw_OfferMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=uwDecision = "APPROVE"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_UwCounter" name="Counter-offer" sourceRef="Gw_UwDecision" targetRef="Gw_CounterMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=uwDecision = "COUNTER_OFFER"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_UwEscalate" name="Escalate" sourceRef="Gw_UwDecision" targetRef="Task_Committee">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=uwDecision = "ESCALATE"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_UwReject" name="Reject" sourceRef="Gw_UwDecision" targetRef="Gw_RejectMerge" />
+    <bpmn:sequenceFlow id="Flow_30" sourceRef="Task_Committee" targetRef="Gw_CommitteeDecision" />
+    <bpmn:sequenceFlow id="Flow_31" sourceRef="Bnd_CommitteeSla" targetRef="Task_EscalateCCO" />
+    <bpmn:sequenceFlow id="Flow_32" sourceRef="Task_EscalateCCO" targetRef="End_SlaEscalated" />
+    <bpmn:sequenceFlow id="Flow_CommApprove" name="Yes" sourceRef="Gw_CommitteeDecision" targetRef="Gw_OfferMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=committeeApproved = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_CommReject" name="No" sourceRef="Gw_CommitteeDecision" targetRef="Gw_RejectMerge" />
+    <bpmn:sequenceFlow id="Flow_33" sourceRef="Gw_RejectMerge" targetRef="Task_SendRejection" />
+    <bpmn:sequenceFlow id="Flow_34" sourceRef="Task_SendRejection" targetRef="End_Rejected" />
+    <bpmn:sequenceFlow id="Flow_35" sourceRef="Gw_OfferMerge" targetRef="Task_GenerateOffer" />
+    <bpmn:sequenceFlow id="Flow_36" sourceRef="Task_GenerateOffer" targetRef="Task_SendOffer" />
+    <bpmn:sequenceFlow id="Flow_37" sourceRef="Task_SendOffer" targetRef="Task_AwaitAcceptance" />
+    <bpmn:sequenceFlow id="Flow_38" sourceRef="Bnd_OfferExpired" targetRef="End_OfferExpired" />
+    <bpmn:sequenceFlow id="Flow_39" sourceRef="Bnd_OfferDeclined" targetRef="End_OfferDeclined" />
+    <bpmn:sequenceFlow id="Flow_40" sourceRef="Task_AwaitAcceptance" targetRef="Gw_SignMerge" />
+    <bpmn:sequenceFlow id="Flow_41" sourceRef="Gw_SignMerge" targetRef="Task_SendAgreement" />
+    <bpmn:sequenceFlow id="Flow_42" sourceRef="Task_SendAgreement" targetRef="Task_AwaitSignature" />
+    <bpmn:sequenceFlow id="Flow_43" sourceRef="Task_AwaitSignature" targetRef="Task_VerifySignature" />
+    <bpmn:sequenceFlow id="Flow_44" sourceRef="Bnd_SignTimeout" targetRef="Gw_SignFailMerge" />
+    <bpmn:sequenceFlow id="Flow_45" sourceRef="Task_VerifySignature" targetRef="Gw_SignValid" />
+    <bpmn:sequenceFlow id="Flow_SignOk" name="Yes" sourceRef="Gw_SignValid" targetRef="Task_CreateAccount">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=signatureValid = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_SignBad" name="No" sourceRef="Gw_SignValid" targetRef="Gw_SignFailMerge" />
+    <bpmn:sequenceFlow id="Flow_46" sourceRef="Gw_SignFailMerge" targetRef="Gw_SignRetry" />
+    <bpmn:sequenceFlow id="Flow_SignRetryYes" name="Yes" sourceRef="Gw_SignRetry" targetRef="Gw_SignMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=signAttempts &lt; 2</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_SignRetryNo" name="No" sourceRef="Gw_SignRetry" targetRef="End_OfferCancelled" />
+    <bpmn:sequenceFlow id="Flow_47" sourceRef="Task_CreateAccount" targetRef="Gw_AcctMerge" />
+    <bpmn:sequenceFlow id="Flow_48" sourceRef="Gw_AcctMerge" targetRef="Task_VerifyBeneficiary" />
+    <bpmn:sequenceFlow id="Flow_49" sourceRef="Task_VerifyBeneficiary" targetRef="Gw_AcctValid" />
+    <bpmn:sequenceFlow id="Flow_AcctOk" name="Yes" sourceRef="Gw_AcctValid" targetRef="Task_Disburse">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=beneficiaryValid = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_AcctBad" name="No" sourceRef="Gw_AcctValid" targetRef="Gw_HoldMerge" />
+    <bpmn:sequenceFlow id="Flow_50" sourceRef="Bnd_PaymentFailed" targetRef="Gw_HoldMerge" />
+    <bpmn:sequenceFlow id="Flow_51" sourceRef="Gw_HoldMerge" targetRef="Task_HoldContact" />
+    <bpmn:sequenceFlow id="Flow_52" sourceRef="Task_HoldContact" targetRef="Gw_Resolved" />
+    <bpmn:sequenceFlow id="Flow_ResolvedYes" name="Yes" sourceRef="Gw_Resolved" targetRef="Gw_AcctMerge">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=issueResolved = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ResolvedNo" name="No" sourceRef="Gw_Resolved" targetRef="Throw_ReverseAccount" />
+    <bpmn:sequenceFlow id="Flow_53" sourceRef="Throw_ReverseAccount" targetRef="End_DisbursementFailed" />
+    <bpmn:sequenceFlow id="Flow_54" sourceRef="Task_Disburse" targetRef="Task_NotifyDisbursed" />
+    <bpmn:sequenceFlow id="Flow_55" sourceRef="Task_NotifyDisbursed" targetRef="End_Disbursed" />
+    <bpmn:association id="Assoc_Fee" associationDirection="One" sourceRef="Bnd_FeeComp" targetRef="Task_RefundFee" />
+    <bpmn:association id="Assoc_Account" associationDirection="One" sourceRef="Bnd_AccountComp" targetRef="Task_CloseAccount" />
+  </bpmn:process>
+  <bpmn:message id="Msg_Application" name="loan-application-submitted" />
+  <bpmn:message id="Msg_Documents" name="documents-resubmitted">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=applicationId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_OfferAccepted" name="offer-accepted">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=applicationId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_OfferDeclined" name="offer-declined">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=applicationId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_Signed" name="agreement-signed">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=applicationId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Msg_Withdraw" name="application-withdrawn">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=applicationId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:error id="Err_BureauDown" name="Credit bureau unavailable" errorCode="BUREAU_UNAVAILABLE" />
+  <bpmn:error id="Err_FraudConfirmed" name="Fraud confirmed" errorCode="FRAUD_CONFIRMED" />
+  <bpmn:error id="Err_PaymentFailed" name="Payment failed" errorCode="PAYMENT_FAILED" />
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_loan-origination">
+      <bpmndi:BPMNShape id="Participant_Main_di" bpmnElement="Participant_Main" isHorizontal="true">
+        <dc:Bounds x="100" y="170" width="6808" height="1820" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Officer_di" bpmnElement="Lane_Officer" isHorizontal="true">
+        <dc:Bounds x="130" y="170" width="6778" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_System_di" bpmnElement="Lane_System" isHorizontal="true">
+        <dc:Bounds x="130" y="430" width="6778" height="520" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Underwriting_di" bpmnElement="Lane_Underwriting" isHorizontal="true">
+        <dc:Bounds x="130" y="950" width="6778" height="390" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Compliance_di" bpmnElement="Lane_Compliance" isHorizontal="true">
+        <dc:Bounds x="130" y="1340" width="6778" height="390" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Operations_di" bpmnElement="Lane_Operations" isHorizontal="true">
+        <dc:Bounds x="130" y="1730" width="6778" height="260" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_Applicant_di" bpmnElement="Participant_Applicant" isHorizontal="true" isExpanded="false">
+        <dc:Bounds x="100" y="60" width="6808" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_Bureau_di" bpmnElement="Participant_Bureau" isHorizontal="true" isExpanded="false">
+        <dc:Bounds x="100" y="2040" width="6808" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Investigation_di" bpmnElement="Sub_Investigation" isExpanded="true">
+        <dc:Bounds x="1817" y="1348" width="706" height="244" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Withdrawal_di" bpmnElement="Sub_Withdrawal" isExpanded="true">
+        <dc:Bounds x="1677" y="178" width="536" height="114" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Application_di" bpmnElement="Start_Application">
+        <dc:Bounds x="202" y="347" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="186" y="387" width="69" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_DocsMerge_di" bpmnElement="Gw_DocsMerge">
+        <dc:Bounds x="345" y="340" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CheckDocs_di" bpmnElement="Task_CheckDocs">
+        <dc:Bounds x="470" y="585" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_DocsComplete_di" bpmnElement="Gw_DocsComplete">
+        <dc:Bounds x="645" y="600" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="642" y="654" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RequestDocs_di" bpmnElement="Task_RequestDocs">
+        <dc:Bounds x="620" y="195" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AwaitDocs_di" bpmnElement="Task_AwaitDocs">
+        <dc:Bounds x="770" y="195" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Lapsed_di" bpmnElement="End_Lapsed">
+        <dc:Bounds x="952" y="217" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="936" y="257" width="69" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CollectFee_di" bpmnElement="Task_CollectFee">
+        <dc:Bounds x="770" y="585" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_RefundFee_di" bpmnElement="Task_RefundFee">
+        <dc:Bounds x="770" y="715" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_VerifySplit_di" bpmnElement="Gw_VerifySplit">
+        <dc:Bounds x="945" y="600" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_KYC_di" bpmnElement="Task_KYC">
+        <dc:Bounds x="1070" y="455" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_KycMatch_di" bpmnElement="Gw_KycMatch">
+        <dc:Bounds x="1245" y="470" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1244" y="524" width="51" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ManualKYC_di" bpmnElement="Task_ManualKYC">
+        <dc:Bounds x="1220" y="325" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_KycMerge_di" bpmnElement="Gw_KycMerge">
+        <dc:Bounds x="1395" y="470" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_FraudScreen_di" bpmnElement="Task_FraudScreen">
+        <dc:Bounds x="1070" y="585" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CreditScore_di" bpmnElement="Task_CreditScore">
+        <dc:Bounds x="1070" y="715" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ManualCredit_di" bpmnElement="Task_ManualCredit">
+        <dc:Bounds x="1145" y="975" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_CreditMerge_di" bpmnElement="Gw_CreditMerge">
+        <dc:Bounds x="1395" y="730" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_VerifyIncome_di" bpmnElement="Task_VerifyIncome">
+        <dc:Bounds x="1220" y="195" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_VerifyJoin_di" bpmnElement="Gw_VerifyJoin">
+        <dc:Bounds x="1545" y="600" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_VerifyOutcome_di" bpmnElement="Gw_VerifyOutcome">
+        <dc:Bounds x="1695" y="600" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1682" y="568" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Freeze_di" bpmnElement="Task_Freeze">
+        <dc:Bounds x="2120" y="1625" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Terminated_di" bpmnElement="End_Terminated">
+        <dc:Bounds x="2302" y="1647" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2288" y="1687" width="63" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_ScoreMerge_di" bpmnElement="Gw_ScoreMerge">
+        <dc:Bounds x="2595" y="600" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Score_di" bpmnElement="Task_Score">
+        <dc:Bounds x="2720" y="585" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_RiskDecision_di" bpmnElement="Gw_RiskDecision">
+        <dc:Bounds x="2895" y="600" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2949" y="592" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_CounterMerge_di" bpmnElement="Gw_CounterMerge">
+        <dc:Bounds x="2895" y="470" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_RestructuredBefore_di" bpmnElement="Gw_RestructuredBefore">
+        <dc:Bounds x="3045" y="470" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3030" y="524" width="81" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Restructure_di" bpmnElement="Task_Restructure">
+        <dc:Bounds x="3020" y="325" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_ChecksSplit_di" bpmnElement="Gw_ChecksSplit">
+        <dc:Bounds x="3045" y="1120" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2966" y="1098" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Collateral_di" bpmnElement="Task_Collateral">
+        <dc:Bounds x="3170" y="975" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Guarantor_di" bpmnElement="Task_Guarantor">
+        <dc:Bounds x="3170" y="1105" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_EDD_di" bpmnElement="Task_EDD">
+        <dc:Bounds x="3170" y="1235" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_ChecksJoin_di" bpmnElement="Gw_ChecksJoin">
+        <dc:Bounds x="3345" y="1120" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Underwrite_di" bpmnElement="Task_Underwrite">
+        <dc:Bounds x="3470" y="1105" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_UwDecision_di" bpmnElement="Gw_UwDecision">
+        <dc:Bounds x="3645" y="1120" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3632" y="1174" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Committee_di" bpmnElement="Task_Committee">
+        <dc:Bounds x="3770" y="1235" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_EscalateCCO_di" bpmnElement="Task_EscalateCCO">
+        <dc:Bounds x="3920" y="1105" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_SlaEscalated_di" bpmnElement="End_SlaEscalated">
+        <dc:Bounds x="4102" y="1127" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4092" y="1167" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_CommitteeDecision_di" bpmnElement="Gw_CommitteeDecision">
+        <dc:Bounds x="3945" y="1250" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3942" y="1304" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_RejectMerge_di" bpmnElement="Gw_RejectMerge">
+        <dc:Bounds x="3345" y="860" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendRejection_di" bpmnElement="Task_SendRejection">
+        <dc:Bounds x="3470" y="845" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Rejected_di" bpmnElement="End_Rejected">
+        <dc:Bounds x="3652" y="867" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3579" y="845" width="69" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_OfferMerge_di" bpmnElement="Gw_OfferMerge">
+        <dc:Bounds x="4245" y="600" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_GenerateOffer_di" bpmnElement="Task_GenerateOffer">
+        <dc:Bounds x="4370" y="585" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendOffer_di" bpmnElement="Task_SendOffer">
+        <dc:Bounds x="4520" y="325" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AwaitAcceptance_di" bpmnElement="Task_AwaitAcceptance">
+        <dc:Bounds x="4670" y="325" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_OfferExpired_di" bpmnElement="End_OfferExpired">
+        <dc:Bounds x="4642" y="217" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4620" y="199" width="81" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_OfferDeclined_di" bpmnElement="End_OfferDeclined">
+        <dc:Bounds x="4852" y="217" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4826" y="257" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_SignMerge_di" bpmnElement="Gw_SignMerge">
+        <dc:Bounds x="4845" y="340" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SendAgreement_di" bpmnElement="Task_SendAgreement">
+        <dc:Bounds x="4970" y="325" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_AwaitSignature_di" bpmnElement="Task_AwaitSignature">
+        <dc:Bounds x="5120" y="325" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_VerifySignature_di" bpmnElement="Task_VerifySignature">
+        <dc:Bounds x="5270" y="585" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_SignValid_di" bpmnElement="Gw_SignValid">
+        <dc:Bounds x="5445" y="600" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5442" y="654" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_SignFailMerge_di" bpmnElement="Gw_SignFailMerge">
+        <dc:Bounds x="5445" y="470" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_SignRetry_di" bpmnElement="Gw_SignRetry">
+        <dc:Bounds x="5595" y="470" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5582" y="524" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_OfferCancelled_di" bpmnElement="End_OfferCancelled">
+        <dc:Bounds x="5752" y="477" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5725" y="517" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CreateAccount_di" bpmnElement="Task_CreateAccount">
+        <dc:Bounds x="5570" y="585" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CloseAccount_di" bpmnElement="Task_CloseAccount">
+        <dc:Bounds x="5720" y="715" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_AcctMerge_di" bpmnElement="Gw_AcctMerge">
+        <dc:Bounds x="5745" y="1770" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_VerifyBeneficiary_di" bpmnElement="Task_VerifyBeneficiary">
+        <dc:Bounds x="5870" y="1755" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_AcctValid_di" bpmnElement="Gw_AcctValid">
+        <dc:Bounds x="6045" y="1770" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="6026" y="1824" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Disburse_di" bpmnElement="Task_Disburse">
+        <dc:Bounds x="6320" y="1755" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_HoldMerge_di" bpmnElement="Gw_HoldMerge">
+        <dc:Bounds x="6195" y="1900" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_HoldContact_di" bpmnElement="Task_HoldContact">
+        <dc:Bounds x="6320" y="1885" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Resolved_di" bpmnElement="Gw_Resolved">
+        <dc:Bounds x="6495" y="1900" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="6492" y="1882" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Throw_ReverseAccount_di" bpmnElement="Throw_ReverseAccount">
+        <dc:Bounds x="6652" y="1907" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="6632" y="1947" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_DisbursementFailed_di" bpmnElement="End_DisbursementFailed">
+        <dc:Bounds x="6802" y="1907" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="6782" y="1947" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_NotifyDisbursed_di" bpmnElement="Task_NotifyDisbursed">
+        <dc:Bounds x="6470" y="585" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Disbursed_di" bpmnElement="End_Disbursed">
+        <dc:Bounds x="6652" y="607" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="6626" y="647" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_DocsTimeout_di" bpmnElement="Bnd_DocsTimeout">
+        <dc:Bounds x="852" y="217" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="892" y="195" width="87" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_FeeComp_di" bpmnElement="Bnd_FeeComp">
+        <dc:Bounds x="802" y="647" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="842" y="679" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_BureauDown_di" bpmnElement="Bnd_BureauDown">
+        <dc:Bounds x="1102" y="777" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1142" y="809" width="69" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_Fraud_di" bpmnElement="Bnd_Fraud">
+        <dc:Bounds x="2081" y="1574" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2054" y="1556" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_CommitteeSla_di" bpmnElement="Bnd_CommitteeSla">
+        <dc:Bounds x="3832" y="1217" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3872" y="1195" width="63" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_OfferExpired_di" bpmnElement="Bnd_OfferExpired">
+        <dc:Bounds x="4677" y="307" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4586" y="285" width="87" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_OfferDeclined_di" bpmnElement="Bnd_OfferDeclined">
+        <dc:Bounds x="4727" y="307" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4767" y="299" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_SignTimeout_di" bpmnElement="Bnd_SignTimeout">
+        <dc:Bounds x="5177" y="387" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5217" y="419" width="90" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_AccountComp_di" bpmnElement="Bnd_AccountComp">
+        <dc:Bounds x="5602" y="647" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5642" y="679" width="75" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bnd_PaymentFailed_di" bpmnElement="Bnd_PaymentFailed">
+        <dc:Bounds x="6352" y="1817" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="6392" y="1849" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Inv_di" bpmnElement="Start_Inv">
+        <dc:Bounds x="1852" y="1387" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1830" y="1427" width="81" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Investigate_di" bpmnElement="Task_Investigate">
+        <dc:Bounds x="1970" y="1365" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gw_Confirmed_di" bpmnElement="Gw_Confirmed">
+        <dc:Bounds x="2145" y="1380" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2136" y="1348" width="69" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Cleared_di" bpmnElement="End_Cleared">
+        <dc:Bounds x="2302" y="1387" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2282" y="1427" width="75" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_FileSAR_di" bpmnElement="Task_FileSAR">
+        <dc:Bounds x="2270" y="1495" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_FraudConfirmed_di" bpmnElement="End_FraudConfirmed">
+        <dc:Bounds x="2452" y="1517" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2425" y="1557" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_Withdraw_di" bpmnElement="Start_Withdraw">
+        <dc:Bounds x="1702" y="217" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1688" y="257" width="63" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Throw_Undo_di" bpmnElement="Throw_Undo">
+        <dc:Bounds x="1852" y="217" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1832" y="257" width="75" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ConfirmWithdrawal_di" bpmnElement="Task_ConfirmWithdrawal">
+        <dc:Bounds x="1970" y="195" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Withdrawn_di" bpmnElement="End_Withdrawn">
+        <dc:Bounds x="2152" y="217" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2142" y="257" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="238" y="365" />
+        <di:waypoint x="345" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="370" y="390" />
+        <di:waypoint x="370" y="625" />
+        <di:waypoint x="470" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="570" y="625" />
+        <di:waypoint x="645" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DocsYes_di" bpmnElement="Flow_DocsYes">
+        <di:waypoint x="695" y="625" />
+        <di:waypoint x="770" y="625" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="705" y="608" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DocsNo_di" bpmnElement="Flow_DocsNo">
+        <di:waypoint x="670" y="600" />
+        <di:waypoint x="670" y="275" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="675" y="580" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="720" y="235" />
+        <di:waypoint x="770" y="235" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="820" y="195" />
+        <di:waypoint x="820" y="184" />
+        <di:waypoint x="370" y="184" />
+        <di:waypoint x="370" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <di:waypoint x="888" y="235" />
+        <di:waypoint x="952" y="235" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <di:waypoint x="870" y="625" />
+        <di:waypoint x="945" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <di:waypoint x="970" y="600" />
+        <di:waypoint x="970" y="495" />
+        <di:waypoint x="1070" y="495" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <di:waypoint x="995" y="625" />
+        <di:waypoint x="1070" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="970" y="650" />
+        <di:waypoint x="970" y="755" />
+        <di:waypoint x="1070" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="995" y="625" />
+        <di:waypoint x="1017" y="625" />
+        <di:waypoint x="1017" y="235" />
+        <di:waypoint x="1220" y="235" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <di:waypoint x="1170" y="495" />
+        <di:waypoint x="1245" y="495" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_KycYes_di" bpmnElement="Flow_KycYes">
+        <di:waypoint x="1295" y="495" />
+        <di:waypoint x="1395" y="495" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1305" y="478" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_KycNo_di" bpmnElement="Flow_KycNo">
+        <di:waypoint x="1270" y="470" />
+        <di:waypoint x="1270" y="405" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1275" y="450" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13">
+        <di:waypoint x="1320" y="365" />
+        <di:waypoint x="1420" y="365" />
+        <di:waypoint x="1420" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
+        <di:waypoint x="1445" y="495" />
+        <di:waypoint x="1570" y="495" />
+        <di:waypoint x="1570" y="600" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15_di" bpmnElement="Flow_15">
+        <di:waypoint x="1170" y="625" />
+        <di:waypoint x="1545" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_16_di" bpmnElement="Flow_16">
+        <di:waypoint x="1170" y="755" />
+        <di:waypoint x="1395" y="755" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17">
+        <di:waypoint x="1120" y="813" />
+        <di:waypoint x="1120" y="1015" />
+        <di:waypoint x="1145" y="1015" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_18_di" bpmnElement="Flow_18">
+        <di:waypoint x="1245" y="1015" />
+        <di:waypoint x="1420" y="1015" />
+        <di:waypoint x="1420" y="780" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19_di" bpmnElement="Flow_19">
+        <di:waypoint x="1445" y="755" />
+        <di:waypoint x="1570" y="755" />
+        <di:waypoint x="1570" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_20_di" bpmnElement="Flow_20">
+        <di:waypoint x="1320" y="235" />
+        <di:waypoint x="1570" y="235" />
+        <di:waypoint x="1570" y="600" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_21_di" bpmnElement="Flow_21">
+        <di:waypoint x="1595" y="625" />
+        <di:waypoint x="1695" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Flag_di" bpmnElement="Flow_Flag">
+        <di:waypoint x="1720" y="650" />
+        <di:waypoint x="1720" y="1470" />
+        <di:waypoint x="1817" y="1470" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1725" y="656" width="63" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_IdUnresolved_di" bpmnElement="Flow_IdUnresolved">
+        <di:waypoint x="1720" y="650" />
+        <di:waypoint x="1720" y="924" />
+        <di:waypoint x="3370" y="924" />
+        <di:waypoint x="3370" y="910" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1652" y="656" width="63" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AllClear_di" bpmnElement="Flow_AllClear">
+        <di:waypoint x="1745" y="625" />
+        <di:waypoint x="2595" y="625" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1755" y="608" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_I1_di" bpmnElement="Flow_I1">
+        <di:waypoint x="1888" y="1405" />
+        <di:waypoint x="1970" y="1405" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_I2_di" bpmnElement="Flow_I2">
+        <di:waypoint x="2070" y="1405" />
+        <di:waypoint x="2145" y="1405" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ConfYes_di" bpmnElement="Flow_ConfYes">
+        <di:waypoint x="2170" y="1430" />
+        <di:waypoint x="2170" y="1535" />
+        <di:waypoint x="2270" y="1535" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2175" y="1436" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ConfNo_di" bpmnElement="Flow_ConfNo">
+        <di:waypoint x="2195" y="1405" />
+        <di:waypoint x="2302" y="1405" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2205" y="1388" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_I3_di" bpmnElement="Flow_I3">
+        <di:waypoint x="2370" y="1535" />
+        <di:waypoint x="2452" y="1535" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_I4_di" bpmnElement="Flow_I4">
+        <di:waypoint x="2523" y="1470" />
+        <di:waypoint x="2620" y="1470" />
+        <di:waypoint x="2620" y="650" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_I5_di" bpmnElement="Flow_I5">
+        <di:waypoint x="2099" y="1610" />
+        <di:waypoint x="2099" y="1665" />
+        <di:waypoint x="2120" y="1665" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_I6_di" bpmnElement="Flow_I6">
+        <di:waypoint x="2220" y="1665" />
+        <di:waypoint x="2302" y="1665" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_22_di" bpmnElement="Flow_22">
+        <di:waypoint x="2645" y="625" />
+        <di:waypoint x="2720" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_23_di" bpmnElement="Flow_23">
+        <di:waypoint x="2820" y="625" />
+        <di:waypoint x="2895" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AutoApprove_di" bpmnElement="Flow_AutoApprove">
+        <di:waypoint x="2945" y="625" />
+        <di:waypoint x="4245" y="625" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2955" y="608" width="75" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AutoReject_di" bpmnElement="Flow_AutoReject">
+        <di:waypoint x="2945" y="625" />
+        <di:waypoint x="2967" y="625" />
+        <di:waypoint x="2967" y="885" />
+        <di:waypoint x="3345" y="885" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2975" y="629" width="39" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Counter_di" bpmnElement="Flow_Counter">
+        <di:waypoint x="2920" y="600" />
+        <di:waypoint x="2920" y="520" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2925" y="560" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Manual_di" bpmnElement="Flow_Manual">
+        <di:waypoint x="2920" y="650" />
+        <di:waypoint x="2920" y="1145" />
+        <di:waypoint x="3045" y="1145" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2928" y="1128" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CounterMerged_di" bpmnElement="Flow_CounterMerged">
+        <di:waypoint x="2945" y="495" />
+        <di:waypoint x="3045" y="495" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RestructYes_di" bpmnElement="Flow_RestructYes">
+        <di:waypoint x="3070" y="470" />
+        <di:waypoint x="3070" y="405" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3075" y="450" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RestructNo_di" bpmnElement="Flow_RestructNo">
+        <di:waypoint x="3095" y="495" />
+        <di:waypoint x="3370" y="495" />
+        <di:waypoint x="3370" y="860" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3105" y="478" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_24_di" bpmnElement="Flow_24">
+        <di:waypoint x="3070" y="325" />
+        <di:waypoint x="3070" y="314" />
+        <di:waypoint x="2620" y="314" />
+        <di:waypoint x="2620" y="600" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ChkCollateral_di" bpmnElement="Flow_ChkCollateral">
+        <di:waypoint x="3070" y="1120" />
+        <di:waypoint x="3070" y="1015" />
+        <di:waypoint x="3170" y="1015" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3075" y="1080" width="75" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ChkGuarantor_di" bpmnElement="Flow_ChkGuarantor">
+        <di:waypoint x="3095" y="1145" />
+        <di:waypoint x="3170" y="1145" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3105" y="1128" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ChkEDD_di" bpmnElement="Flow_ChkEDD">
+        <di:waypoint x="3070" y="1170" />
+        <di:waypoint x="3070" y="1275" />
+        <di:waypoint x="3170" y="1275" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3075" y="1176" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ChkNone_di" bpmnElement="Flow_ChkNone">
+        <di:waypoint x="3070" y="1120" />
+        <di:waypoint x="3070" y="1100" />
+        <di:waypoint x="3370" y="1100" />
+        <di:waypoint x="3370" y="1120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3037" y="1080" width="28" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_25_di" bpmnElement="Flow_25">
+        <di:waypoint x="3270" y="1015" />
+        <di:waypoint x="3370" y="1015" />
+        <di:waypoint x="3370" y="1120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_26_di" bpmnElement="Flow_26">
+        <di:waypoint x="3270" y="1145" />
+        <di:waypoint x="3345" y="1145" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_27_di" bpmnElement="Flow_27">
+        <di:waypoint x="3270" y="1275" />
+        <di:waypoint x="3370" y="1275" />
+        <di:waypoint x="3370" y="1170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_28_di" bpmnElement="Flow_28">
+        <di:waypoint x="3395" y="1145" />
+        <di:waypoint x="3470" y="1145" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_29_di" bpmnElement="Flow_29">
+        <di:waypoint x="3570" y="1145" />
+        <di:waypoint x="3645" y="1145" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_UwApprove_di" bpmnElement="Flow_UwApprove">
+        <di:waypoint x="3695" y="1145" />
+        <di:waypoint x="3717" y="1145" />
+        <di:waypoint x="3717" y="625" />
+        <di:waypoint x="4245" y="625" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3705" y="1149" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_UwCounter_di" bpmnElement="Flow_UwCounter">
+        <di:waypoint x="3670" y="1120" />
+        <di:waypoint x="3670" y="936" />
+        <di:waypoint x="2873" y="936" />
+        <di:waypoint x="2873" y="495" />
+        <di:waypoint x="2895" y="495" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3585" y="1100" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_UwEscalate_di" bpmnElement="Flow_UwEscalate">
+        <di:waypoint x="3670" y="1170" />
+        <di:waypoint x="3670" y="1275" />
+        <di:waypoint x="3770" y="1275" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3678" y="1258" width="51" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_UwReject_di" bpmnElement="Flow_UwReject">
+        <di:waypoint x="3670" y="1120" />
+        <di:waypoint x="3670" y="930" />
+        <di:waypoint x="3370" y="930" />
+        <di:waypoint x="3370" y="910" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3675" y="1100" width="39" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_30_di" bpmnElement="Flow_30">
+        <di:waypoint x="3870" y="1275" />
+        <di:waypoint x="3945" y="1275" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_31_di" bpmnElement="Flow_31">
+        <di:waypoint x="3850" y="1217" />
+        <di:waypoint x="3850" y="1145" />
+        <di:waypoint x="3920" y="1145" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_32_di" bpmnElement="Flow_32">
+        <di:waypoint x="4020" y="1145" />
+        <di:waypoint x="4102" y="1145" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CommApprove_di" bpmnElement="Flow_CommApprove">
+        <di:waypoint x="3995" y="1275" />
+        <di:waypoint x="4270" y="1275" />
+        <di:waypoint x="4270" y="650" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4005" y="1258" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CommReject_di" bpmnElement="Flow_CommReject">
+        <di:waypoint x="3970" y="1250" />
+        <di:waypoint x="3970" y="1196" />
+        <di:waypoint x="3727" y="1196" />
+        <di:waypoint x="3727" y="838" />
+        <di:waypoint x="3370" y="838" />
+        <di:waypoint x="3370" y="860" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3975" y="1230" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_33_di" bpmnElement="Flow_33">
+        <di:waypoint x="3395" y="885" />
+        <di:waypoint x="3470" y="885" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_34_di" bpmnElement="Flow_34">
+        <di:waypoint x="3570" y="885" />
+        <di:waypoint x="3652" y="885" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_35_di" bpmnElement="Flow_35">
+        <di:waypoint x="4295" y="625" />
+        <di:waypoint x="4370" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_36_di" bpmnElement="Flow_36">
+        <di:waypoint x="4470" y="625" />
+        <di:waypoint x="4570" y="625" />
+        <di:waypoint x="4570" y="405" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_37_di" bpmnElement="Flow_37">
+        <di:waypoint x="4620" y="365" />
+        <di:waypoint x="4670" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_38_di" bpmnElement="Flow_38">
+        <di:waypoint x="4695" y="307" />
+        <di:waypoint x="4695" y="261" />
+        <di:waypoint x="4660" y="261" />
+        <di:waypoint x="4660" y="253" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_39_di" bpmnElement="Flow_39">
+        <di:waypoint x="4745" y="307" />
+        <di:waypoint x="4745" y="235" />
+        <di:waypoint x="4852" y="235" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_40_di" bpmnElement="Flow_40">
+        <di:waypoint x="4770" y="365" />
+        <di:waypoint x="4845" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_41_di" bpmnElement="Flow_41">
+        <di:waypoint x="4895" y="365" />
+        <di:waypoint x="4970" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_42_di" bpmnElement="Flow_42">
+        <di:waypoint x="5070" y="365" />
+        <di:waypoint x="5120" y="365" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_43_di" bpmnElement="Flow_43">
+        <di:waypoint x="5170" y="405" />
+        <di:waypoint x="5170" y="625" />
+        <di:waypoint x="5270" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_44_di" bpmnElement="Flow_44">
+        <di:waypoint x="5195" y="423" />
+        <di:waypoint x="5195" y="495" />
+        <di:waypoint x="5445" y="495" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_45_di" bpmnElement="Flow_45">
+        <di:waypoint x="5370" y="625" />
+        <di:waypoint x="5445" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignOk_di" bpmnElement="Flow_SignOk">
+        <di:waypoint x="5495" y="625" />
+        <di:waypoint x="5570" y="625" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5505" y="608" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignBad_di" bpmnElement="Flow_SignBad">
+        <di:waypoint x="5470" y="600" />
+        <di:waypoint x="5470" y="520" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5475" y="580" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_46_di" bpmnElement="Flow_46">
+        <di:waypoint x="5495" y="495" />
+        <di:waypoint x="5595" y="495" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignRetryYes_di" bpmnElement="Flow_SignRetryYes">
+        <di:waypoint x="5620" y="470" />
+        <di:waypoint x="5620" y="320" />
+        <di:waypoint x="4870" y="320" />
+        <di:waypoint x="4870" y="340" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5625" y="450" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignRetryNo_di" bpmnElement="Flow_SignRetryNo">
+        <di:waypoint x="5645" y="495" />
+        <di:waypoint x="5752" y="495" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5655" y="478" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_47_di" bpmnElement="Flow_47">
+        <di:waypoint x="5620" y="665" />
+        <di:waypoint x="5620" y="1795" />
+        <di:waypoint x="5745" y="1795" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_48_di" bpmnElement="Flow_48">
+        <di:waypoint x="5795" y="1795" />
+        <di:waypoint x="5870" y="1795" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_49_di" bpmnElement="Flow_49">
+        <di:waypoint x="5970" y="1795" />
+        <di:waypoint x="6045" y="1795" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AcctOk_di" bpmnElement="Flow_AcctOk">
+        <di:waypoint x="6095" y="1795" />
+        <di:waypoint x="6320" y="1795" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="6105" y="1778" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_AcctBad_di" bpmnElement="Flow_AcctBad">
+        <di:waypoint x="6095" y="1795" />
+        <di:waypoint x="6220" y="1795" />
+        <di:waypoint x="6220" y="1900" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="6105" y="1799" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_50_di" bpmnElement="Flow_50">
+        <di:waypoint x="6370" y="1853" />
+        <di:waypoint x="6370" y="1873" />
+        <di:waypoint x="6173" y="1873" />
+        <di:waypoint x="6173" y="1925" />
+        <di:waypoint x="6195" y="1925" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_51_di" bpmnElement="Flow_51">
+        <di:waypoint x="6245" y="1925" />
+        <di:waypoint x="6320" y="1925" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_52_di" bpmnElement="Flow_52">
+        <di:waypoint x="6420" y="1925" />
+        <di:waypoint x="6495" y="1925" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ResolvedYes_di" bpmnElement="Flow_ResolvedYes">
+        <di:waypoint x="6520" y="1950" />
+        <di:waypoint x="6520" y="1970" />
+        <di:waypoint x="5770" y="1970" />
+        <di:waypoint x="5770" y="1820" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="6525" y="1956" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ResolvedNo_di" bpmnElement="Flow_ResolvedNo">
+        <di:waypoint x="6545" y="1925" />
+        <di:waypoint x="6652" y="1925" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="6555" y="1908" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_53_di" bpmnElement="Flow_53">
+        <di:waypoint x="6688" y="1925" />
+        <di:waypoint x="6802" y="1925" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_54_di" bpmnElement="Flow_54">
+        <di:waypoint x="6420" y="1795" />
+        <di:waypoint x="6520" y="1795" />
+        <di:waypoint x="6520" y="665" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_55_di" bpmnElement="Flow_55">
+        <di:waypoint x="6570" y="625" />
+        <di:waypoint x="6652" y="625" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_W1_di" bpmnElement="Flow_W1">
+        <di:waypoint x="1738" y="235" />
+        <di:waypoint x="1852" y="235" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_W2_di" bpmnElement="Flow_W2">
+        <di:waypoint x="1888" y="235" />
+        <di:waypoint x="1970" y="235" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_W3_di" bpmnElement="Flow_W3">
+        <di:waypoint x="2070" y="235" />
+        <di:waypoint x="2152" y="235" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_Fee_di" bpmnElement="Assoc_Fee">
+        <di:waypoint x="820" y="683" />
+        <di:waypoint x="820" y="715" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Assoc_Account_di" bpmnElement="Assoc_Account">
+        <di:waypoint x="5620" y="683" />
+        <di:waypoint x="5620" y="695" />
+        <di:waypoint x="5770" y="695" />
+        <di:waypoint x="5770" y="715" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_App_di" bpmnElement="MsgFlow_App">
+        <di:waypoint x="220" y="120" />
+        <di:waypoint x="220" y="347" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="224" y="126" width="69" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_DocReq_di" bpmnElement="MsgFlow_DocReq">
+        <di:waypoint x="670" y="195" />
+        <di:waypoint x="670" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="674" y="126" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Docs_di" bpmnElement="MsgFlow_Docs">
+        <di:waypoint x="820" y="120" />
+        <di:waypoint x="820" y="195" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="824" y="126" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Withdraw_di" bpmnElement="MsgFlow_Withdraw">
+        <di:waypoint x="1720" y="120" />
+        <di:waypoint x="1720" y="217" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1724" y="126" width="63" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Offer_di" bpmnElement="MsgFlow_Offer">
+        <di:waypoint x="4570" y="325" />
+        <di:waypoint x="4570" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4574" y="126" width="75" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Accept_di" bpmnElement="MsgFlow_Accept">
+        <di:waypoint x="4720" y="120" />
+        <di:waypoint x="4720" y="325" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4724" y="126" width="63" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Agreement_di" bpmnElement="MsgFlow_Agreement">
+        <di:waypoint x="5020" y="325" />
+        <di:waypoint x="5020" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5024" y="126" width="57" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Signed_di" bpmnElement="MsgFlow_Signed">
+        <di:waypoint x="5170" y="120" />
+        <di:waypoint x="5170" y="325" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5174" y="126" width="57" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_BureauReq_di" bpmnElement="MsgFlow_BureauReq">
+        <di:waypoint x="1100" y="795" />
+        <di:waypoint x="1100" y="2040" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1104" y="2006" width="45" height="28" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_BureauResp_di" bpmnElement="MsgFlow_BureauResp">
+        <di:waypoint x="1140" y="2040" />
+        <di:waypoint x="1140" y="795" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1144" y="2002" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
